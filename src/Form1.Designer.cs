@@ -57,6 +57,7 @@ namespace JSONExtractor
             this.buttonAttrRemove = new System.Windows.Forms.Button();
             this.buttonAttrUp = new System.Windows.Forms.Button();
             this.buttonAttrDown = new System.Windows.Forms.Button();
+            this.textBoxDefault = new System.Windows.Forms.TextBox();
             this.splitContainerC1vsC2 = new System.Windows.Forms.SplitContainer();
             this.groupBox5 = new System.Windows.Forms.GroupBox();
             this.dataGridViewFilters = new System.Windows.Forms.DataGridView();
@@ -64,10 +65,10 @@ namespace JSONExtractor
             this.dataGridViewAttributes = new System.Windows.Forms.DataGridView();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.textBoxEventLog = new System.Windows.Forms.TextBox();
-            this.textBoxDefault = new System.Windows.Forms.TextBox();
             this.openFileDialogSample = new System.Windows.Forms.OpenFileDialog();
             this.openFileDialogInputFiles = new System.Windows.Forms.OpenFileDialog();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
+            this.textBoxFilterPattern = new System.Windows.Forms.TextBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerTopVsBottom)).BeginInit();
             this.splitContainerTopVsBottom.Panel1.SuspendLayout();
             this.splitContainerTopVsBottom.Panel2.SuspendLayout();
@@ -123,7 +124,7 @@ namespace JSONExtractor
             // 
             this.splitContainerTopVsBottom.Panel2.Controls.Add(this.groupBox1);
             this.splitContainerTopVsBottom.Size = new System.Drawing.Size(913, 527);
-            this.splitContainerTopVsBottom.SplitterDistance = 450;
+            this.splitContainerTopVsBottom.SplitterDistance = 449;
             this.splitContainerTopVsBottom.SplitterWidth = 2;
             this.splitContainerTopVsBottom.TabIndex = 0;
             // 
@@ -141,7 +142,7 @@ namespace JSONExtractor
             // splitContainerAvsBC.Panel2
             // 
             this.splitContainerAvsBC.Panel2.Controls.Add(this.splitContainerBvsC);
-            this.splitContainerAvsBC.Size = new System.Drawing.Size(913, 450);
+            this.splitContainerAvsBC.Size = new System.Drawing.Size(913, 449);
             this.splitContainerAvsBC.SplitterDistance = 111;
             this.splitContainerAvsBC.SplitterWidth = 2;
             this.splitContainerAvsBC.TabIndex = 0;
@@ -154,7 +155,7 @@ namespace JSONExtractor
             this.groupBox2.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.groupBox2.Name = "groupBox2";
             this.groupBox2.Padding = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.groupBox2.Size = new System.Drawing.Size(111, 450);
+            this.groupBox2.Size = new System.Drawing.Size(111, 449);
             this.groupBox2.TabIndex = 0;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Controls";
@@ -170,7 +171,7 @@ namespace JSONExtractor
             this.flowLayoutPanel1.Location = new System.Drawing.Point(2, 17);
             this.flowLayoutPanel1.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.flowLayoutPanel1.Name = "flowLayoutPanel1";
-            this.flowLayoutPanel1.Size = new System.Drawing.Size(107, 432);
+            this.flowLayoutPanel1.Size = new System.Drawing.Size(107, 431);
             this.flowLayoutPanel1.TabIndex = 0;
             // 
             // buttonLoadSample
@@ -238,7 +239,7 @@ namespace JSONExtractor
             // splitContainerBvsC.Panel2
             // 
             this.splitContainerBvsC.Panel2.Controls.Add(this.splitContainerC1vsC2);
-            this.splitContainerBvsC.Size = new System.Drawing.Size(800, 450);
+            this.splitContainerBvsC.Size = new System.Drawing.Size(800, 449);
             this.splitContainerBvsC.SplitterDistance = 358;
             this.splitContainerBvsC.SplitterWidth = 2;
             this.splitContainerBvsC.TabIndex = 0;
@@ -257,7 +258,7 @@ namespace JSONExtractor
             // splitContainerTreeVsOpts.Panel2
             // 
             this.splitContainerTreeVsOpts.Panel2.Controls.Add(this.splitContainerFilterVsAttrControls);
-            this.splitContainerTreeVsOpts.Size = new System.Drawing.Size(358, 450);
+            this.splitContainerTreeVsOpts.Size = new System.Drawing.Size(358, 449);
             this.splitContainerTreeVsOpts.SplitterDistance = 238;
             this.splitContainerTreeVsOpts.SplitterWidth = 2;
             this.splitContainerTreeVsOpts.TabIndex = 1;
@@ -270,18 +271,19 @@ namespace JSONExtractor
             this.groupBox3.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.groupBox3.Name = "groupBox3";
             this.groupBox3.Padding = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.groupBox3.Size = new System.Drawing.Size(238, 450);
+            this.groupBox3.Size = new System.Drawing.Size(238, 449);
             this.groupBox3.TabIndex = 0;
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "JSON Attribute Structure";
             // 
             // treeViewJSON
             // 
+            this.treeViewJSON.CheckBoxes = true;
             this.treeViewJSON.Dock = System.Windows.Forms.DockStyle.Fill;
             this.treeViewJSON.Location = new System.Drawing.Point(2, 17);
             this.treeViewJSON.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.treeViewJSON.Name = "treeViewJSON";
-            this.treeViewJSON.Size = new System.Drawing.Size(234, 432);
+            this.treeViewJSON.Size = new System.Drawing.Size(234, 431);
             this.treeViewJSON.TabIndex = 0;
             // 
             // splitContainerFilterVsAttrControls
@@ -299,8 +301,8 @@ namespace JSONExtractor
             // splitContainerFilterVsAttrControls.Panel2
             // 
             this.splitContainerFilterVsAttrControls.Panel2.Controls.Add(this.groupBox7);
-            this.splitContainerFilterVsAttrControls.Size = new System.Drawing.Size(118, 450);
-            this.splitContainerFilterVsAttrControls.SplitterDistance = 225;
+            this.splitContainerFilterVsAttrControls.Size = new System.Drawing.Size(118, 449);
+            this.splitContainerFilterVsAttrControls.SplitterDistance = 224;
             this.splitContainerFilterVsAttrControls.SplitterWidth = 2;
             this.splitContainerFilterVsAttrControls.TabIndex = 1;
             // 
@@ -312,7 +314,7 @@ namespace JSONExtractor
             this.groupBox4.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.groupBox4.Name = "groupBox4";
             this.groupBox4.Padding = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.groupBox4.Size = new System.Drawing.Size(118, 225);
+            this.groupBox4.Size = new System.Drawing.Size(118, 224);
             this.groupBox4.TabIndex = 0;
             this.groupBox4.TabStop = false;
             this.groupBox4.Text = "Filter";
@@ -320,22 +322,21 @@ namespace JSONExtractor
             // flowLayoutPanel3
             // 
             this.flowLayoutPanel3.Controls.Add(this.comboBoxFilterType);
+            this.flowLayoutPanel3.Controls.Add(this.textBoxFilterPattern);
             this.flowLayoutPanel3.Controls.Add(this.buttonFilterAdd);
             this.flowLayoutPanel3.Controls.Add(this.buttonFilterRemove);
             this.flowLayoutPanel3.Dock = System.Windows.Forms.DockStyle.Fill;
             this.flowLayoutPanel3.Location = new System.Drawing.Point(2, 17);
             this.flowLayoutPanel3.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.flowLayoutPanel3.Name = "flowLayoutPanel3";
-            this.flowLayoutPanel3.Size = new System.Drawing.Size(114, 207);
+            this.flowLayoutPanel3.Size = new System.Drawing.Size(114, 206);
             this.flowLayoutPanel3.TabIndex = 3;
             // 
             // comboBoxFilterType
             // 
             this.comboBoxFilterType.FormattingEnabled = true;
             this.comboBoxFilterType.Items.AddRange(new object[] {
-            "Equals",
-            "Contains",
-            "StartsWith",
+            "Matches",
             "LessThanEqualTo",
             "GreaterThanEqualTo",
             "Empty",
@@ -348,7 +349,7 @@ namespace JSONExtractor
             // 
             // buttonFilterAdd
             // 
-            this.buttonFilterAdd.Location = new System.Drawing.Point(2, 26);
+            this.buttonFilterAdd.Location = new System.Drawing.Point(2, 55);
             this.buttonFilterAdd.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.buttonFilterAdd.Name = "buttonFilterAdd";
             this.buttonFilterAdd.Size = new System.Drawing.Size(81, 22);
@@ -358,7 +359,7 @@ namespace JSONExtractor
             // 
             // buttonFilterRemove
             // 
-            this.buttonFilterRemove.Location = new System.Drawing.Point(2, 50);
+            this.buttonFilterRemove.Location = new System.Drawing.Point(2, 79);
             this.buttonFilterRemove.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.buttonFilterRemove.Name = "buttonFilterRemove";
             this.buttonFilterRemove.Size = new System.Drawing.Size(81, 22);
@@ -462,6 +463,14 @@ namespace JSONExtractor
             this.buttonAttrDown.Text = "Down";
             this.buttonAttrDown.UseVisualStyleBackColor = true;
             // 
+            // textBoxDefault
+            // 
+            this.textBoxDefault.Location = new System.Drawing.Point(3, 149);
+            this.textBoxDefault.Name = "textBoxDefault";
+            this.textBoxDefault.Size = new System.Drawing.Size(100, 23);
+            this.textBoxDefault.TabIndex = 7;
+            this.textBoxDefault.Text = "default";
+            // 
             // splitContainerC1vsC2
             // 
             this.splitContainerC1vsC2.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -477,8 +486,8 @@ namespace JSONExtractor
             // splitContainerC1vsC2.Panel2
             // 
             this.splitContainerC1vsC2.Panel2.Controls.Add(this.groupBox6);
-            this.splitContainerC1vsC2.Size = new System.Drawing.Size(440, 450);
-            this.splitContainerC1vsC2.SplitterDistance = 196;
+            this.splitContainerC1vsC2.Size = new System.Drawing.Size(440, 449);
+            this.splitContainerC1vsC2.SplitterDistance = 195;
             this.splitContainerC1vsC2.SplitterWidth = 2;
             this.splitContainerC1vsC2.TabIndex = 0;
             // 
@@ -490,7 +499,7 @@ namespace JSONExtractor
             this.groupBox5.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.groupBox5.Name = "groupBox5";
             this.groupBox5.Padding = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.groupBox5.Size = new System.Drawing.Size(440, 196);
+            this.groupBox5.Size = new System.Drawing.Size(440, 195);
             this.groupBox5.TabIndex = 0;
             this.groupBox5.TabStop = false;
             this.groupBox5.Text = "Filters on Selected JSON Files";
@@ -504,7 +513,7 @@ namespace JSONExtractor
             this.dataGridViewFilters.Name = "dataGridViewFilters";
             this.dataGridViewFilters.RowHeadersWidth = 82;
             this.dataGridViewFilters.RowTemplate.Height = 41;
-            this.dataGridViewFilters.Size = new System.Drawing.Size(436, 178);
+            this.dataGridViewFilters.Size = new System.Drawing.Size(436, 177);
             this.dataGridViewFilters.TabIndex = 0;
             // 
             // groupBox6
@@ -540,7 +549,7 @@ namespace JSONExtractor
             this.groupBox1.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Padding = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.groupBox1.Size = new System.Drawing.Size(913, 75);
+            this.groupBox1.Size = new System.Drawing.Size(913, 76);
             this.groupBox1.TabIndex = 0;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Event Log";
@@ -553,16 +562,8 @@ namespace JSONExtractor
             this.textBoxEventLog.Multiline = true;
             this.textBoxEventLog.Name = "textBoxEventLog";
             this.textBoxEventLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.textBoxEventLog.Size = new System.Drawing.Size(909, 57);
+            this.textBoxEventLog.Size = new System.Drawing.Size(909, 58);
             this.textBoxEventLog.TabIndex = 0;
-            // 
-            // textBoxDefault
-            // 
-            this.textBoxDefault.Location = new System.Drawing.Point(3, 149);
-            this.textBoxDefault.Name = "textBoxDefault";
-            this.textBoxDefault.Size = new System.Drawing.Size(100, 23);
-            this.textBoxDefault.TabIndex = 7;
-            this.textBoxDefault.Text = "default";
             // 
             // openFileDialogSample
             // 
@@ -577,6 +578,14 @@ namespace JSONExtractor
             this.openFileDialogInputFiles.Multiselect = true;
             this.openFileDialogInputFiles.ShowReadOnly = true;
             this.openFileDialogInputFiles.SupportMultiDottedExtensions = true;
+            // 
+            // textBoxFilterPattern
+            // 
+            this.textBoxFilterPattern.Location = new System.Drawing.Point(3, 28);
+            this.textBoxFilterPattern.Name = "textBoxFilterPattern";
+            this.textBoxFilterPattern.Size = new System.Drawing.Size(100, 23);
+            this.textBoxFilterPattern.TabIndex = 3;
+            this.textBoxFilterPattern.Text = "pattern";
             // 
             // Form1
             // 
@@ -612,6 +621,7 @@ namespace JSONExtractor
             this.splitContainerFilterVsAttrControls.ResumeLayout(false);
             this.groupBox4.ResumeLayout(false);
             this.flowLayoutPanel3.ResumeLayout(false);
+            this.flowLayoutPanel3.PerformLayout();
             this.groupBox7.ResumeLayout(false);
             this.flowLayoutPanel2.ResumeLayout(false);
             this.flowLayoutPanel2.PerformLayout();
@@ -669,6 +679,7 @@ namespace JSONExtractor
         private System.Windows.Forms.OpenFileDialog openFileDialogSample;
         private System.Windows.Forms.OpenFileDialog openFileDialogInputFiles;
         private System.Windows.Forms.ToolTip toolTip1;
+        private System.Windows.Forms.TextBox textBoxFilterPattern;
     }
 }
 
