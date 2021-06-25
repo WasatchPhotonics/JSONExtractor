@@ -285,7 +285,7 @@ namespace JSONExtractor
             this.treeViewJSON.Name = "treeViewJSON";
             this.treeViewJSON.Size = new System.Drawing.Size(234, 431);
             this.treeViewJSON.TabIndex = 0;
-            this.treeViewJSON.Click += new System.EventHandler(this.treeViewJSON_Click);
+            this.treeViewJSON.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.treeViewJSON_AfterSelect);
             // 
             // splitContainerFilterVsAttrControls
             // 

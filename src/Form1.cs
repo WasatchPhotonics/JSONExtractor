@@ -15,8 +15,11 @@ namespace JSONExtractor
     public partial class Form1 : Form
     {
         IDictionary<string, object> treeRoot;
-        List<FilterAttribute> filterAttributes = new List<FilterAttribute>();
-        List<ExtractAttribute> extractAttributes = new List<ExtractAttribute>();
+
+        BindingList<FilterAttribute> filterAttributes = new BindingList<FilterAttribute>();
+        BindingList<ExtractAttribute> extractAttributes = new BindingList<ExtractAttribute>();
+        BindingSource filterBindingSource;
+        BindingSource extractBindingSource;
 
         Logger logger = Logger.getInstance();
 
@@ -25,6 +28,9 @@ namespace JSONExtractor
             InitializeComponent();
             logger.setTextBox(textBoxEventLog);
             logger.level = Logger.LogLevel.DEBUG;
+
+            filterBindingSource = new BindingSource(filterAttributes, null);
+            extractBindingSource = new BindingSource(extractAttributes, null);
 
             dataGridViewAttributes.DataSource = extractAttributes;
             dataGridViewFilters.DataSource = filterAttributes;
@@ -64,8 +70,9 @@ namespace JSONExtractor
             treeViewJSON.EndUpdate();
         }
 
-        // traverse down the loaded JSON object tree starting at jsonNode, populating
-        // the contents into the TreeView branch at treeNode
+        // Traverse down the loaded JSON object tree starting at jsonNode, populating
+        // the contents into the TreeView branch at treeNode.  It's not clear whether
+        // we need to store the original value in the Tag.
         void populateTreeView(IDictionary<string, object> jsonNode, TreeNode treeNode)
         {
             foreach (string key in jsonNode.Keys)
@@ -103,28 +110,42 @@ namespace JSONExtractor
                 pattern = textBoxFilterPattern.Text
             };
             filterAttributes.Add(fa);
+            filterBindingSource.ResetBindings(false);
             logger.debug("added FilterAttribute to filterAttributes");
         }
 
         private void buttonAttrAdd_Click(object sender, EventArgs e)
         {
-            if (treeViewJSON.SelectedNode is null)
+            var tvn = treeViewJSON.SelectedNode;
+            if (tvn is null)
                 return;
 
             var ea = new ExtractAttribute()
             {
                 label = textBoxExtractAttributeLabel.Text,
                 jsonFullPath = treeViewJSON.SelectedNode.FullPath,
-                aggregateType = (ExtractAttribute.AggregateType)Enum.Parse(typeof(ExtractAttribute.AggregateType), comboBoxExtractAttributeAggregateType.SelectedItem.ToString()),
                 defaultValue = textBoxExtractAttributeDefault.Text
             };
+
+            if (tvn.Tag is List<object>)
+            {
+                logger.debug("AttrAdd: tag is list");
+                ea.aggregateType = (ExtractAttribute.AggregateType)Enum.Parse(
+                    typeof(ExtractAttribute.AggregateType),
+                    comboBoxExtractAttributeAggregateType.SelectedItem.ToString());
+            }
+            else
+                logger.debug("AttrAdd: tag is not list");
+
             extractAttributes.Add(ea);
+            extractBindingSource.ResetBindings(false);
             logger.debug("added ExtractAttribute to extractAttributes");
         }
 
-        private void treeViewJSON_Click(object sender, EventArgs e)
+        private void treeViewJSON_AfterSelect(object sender, TreeViewEventArgs e)
         {
-            if (treeViewJSON.SelectedNode is null)
+            var tvn = treeViewJSON.SelectedNode;
+            if (tvn is null)
             {
                 buttonAddExtractAttribute.Enabled = 
                 buttonFilterAdd.Enabled = false;
@@ -134,7 +155,22 @@ namespace JSONExtractor
             buttonAddExtractAttribute.Enabled = 
             buttonFilterAdd.Enabled = true;
 
+            bool isList = tvn.Tag is List<object>;
+            if (isList)
+            {
+                comboBoxExtractAttributeAggregateType.SelectedIndex = 0;
+                comboBoxExtractAttributeAggregateType.Enabled = true;
+            }
+            else
+            {
+                // deselect any aggregate type
+                logger.debug("treeViewClick: tag is not list ({0}, {1})", tvn.FullPath, tvn.Tag);
+                comboBoxExtractAttributeAggregateType.SelectedIndex = -1;
+                comboBoxExtractAttributeAggregateType.Enabled = false;
+            }
+
             logger.debug("selected TreeView node {0}", treeViewJSON.SelectedNode.FullPath);
+
         }
     }
 }
