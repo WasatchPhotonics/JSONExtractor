@@ -15,6 +15,9 @@ namespace JSONExtractor
     public partial class Form1 : Form
     {
         IDictionary<string, object> treeRoot;
+        List<FilterAttribute> filterAttributes = new List<FilterAttribute>();
+        List<ExtractAttribute> extractAttributes = new List<ExtractAttribute>();
+
         Logger logger = Logger.getInstance();
 
         public Form1()
@@ -22,6 +25,12 @@ namespace JSONExtractor
             InitializeComponent();
             logger.setTextBox(textBoxEventLog);
             logger.level = Logger.LogLevel.DEBUG;
+
+            dataGridViewAttributes.DataSource = extractAttributes;
+            dataGridViewFilters.DataSource = filterAttributes;
+
+            comboBoxExtractAttributeAggregateType.SelectedIndex = 0;
+            comboBoxFilterType.SelectedIndex = 0;
         }
 
         private void buttonLoadSample_Click(object sender, EventArgs e)
@@ -80,6 +89,52 @@ namespace JSONExtractor
                     treeNode.Nodes.Add(key).Tag = value;
                 }
             }
+        }
+
+        private void buttonFilterAdd_Click(object sender, EventArgs e)
+        {
+            if (treeViewJSON.SelectedNode is null)
+                return;
+
+            var fa = new FilterAttribute()
+            {
+                jsonFullPath = treeViewJSON.SelectedNode.FullPath,
+                filterType = (FilterAttribute.FilterType)Enum.Parse(typeof(FilterAttribute.FilterType), comboBoxFilterType.SelectedItem.ToString()),
+                pattern = textBoxFilterPattern.Text
+            };
+            filterAttributes.Add(fa);
+            logger.debug("added FilterAttribute to filterAttributes");
+        }
+
+        private void buttonAttrAdd_Click(object sender, EventArgs e)
+        {
+            if (treeViewJSON.SelectedNode is null)
+                return;
+
+            var ea = new ExtractAttribute()
+            {
+                label = textBoxExtractAttributeLabel.Text,
+                jsonFullPath = treeViewJSON.SelectedNode.FullPath,
+                aggregateType = (ExtractAttribute.AggregateType)Enum.Parse(typeof(ExtractAttribute.AggregateType), comboBoxExtractAttributeAggregateType.SelectedItem.ToString()),
+                defaultValue = textBoxExtractAttributeDefault.Text
+            };
+            extractAttributes.Add(ea);
+            logger.debug("added ExtractAttribute to extractAttributes");
+        }
+
+        private void treeViewJSON_Click(object sender, EventArgs e)
+        {
+            if (treeViewJSON.SelectedNode is null)
+            {
+                buttonAddExtractAttribute.Enabled = 
+                buttonFilterAdd.Enabled = false;
+                return;
+            }
+
+            buttonAddExtractAttribute.Enabled = 
+            buttonFilterAdd.Enabled = true;
+
+            logger.debug("selected TreeView node {0}", treeViewJSON.SelectedNode.FullPath);
         }
     }
 }

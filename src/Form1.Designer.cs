@@ -47,17 +47,18 @@ namespace JSONExtractor
             this.groupBox4 = new System.Windows.Forms.GroupBox();
             this.flowLayoutPanel3 = new System.Windows.Forms.FlowLayoutPanel();
             this.comboBoxFilterType = new System.Windows.Forms.ComboBox();
+            this.textBoxFilterPattern = new System.Windows.Forms.TextBox();
             this.buttonFilterAdd = new System.Windows.Forms.Button();
             this.buttonFilterRemove = new System.Windows.Forms.Button();
             this.groupBox7 = new System.Windows.Forms.GroupBox();
             this.flowLayoutPanel2 = new System.Windows.Forms.FlowLayoutPanel();
-            this.textBoxAttrLabel = new System.Windows.Forms.TextBox();
-            this.comboBoxAttrArrayRollup = new System.Windows.Forms.ComboBox();
-            this.buttonAttrAdd = new System.Windows.Forms.Button();
-            this.buttonAttrRemove = new System.Windows.Forms.Button();
-            this.buttonAttrUp = new System.Windows.Forms.Button();
-            this.buttonAttrDown = new System.Windows.Forms.Button();
-            this.textBoxDefault = new System.Windows.Forms.TextBox();
+            this.textBoxExtractAttributeLabel = new System.Windows.Forms.TextBox();
+            this.comboBoxExtractAttributeAggregateType = new System.Windows.Forms.ComboBox();
+            this.buttonAddExtractAttribute = new System.Windows.Forms.Button();
+            this.buttonExtractAttributeRemove = new System.Windows.Forms.Button();
+            this.buttonExtractAttributeUp = new System.Windows.Forms.Button();
+            this.buttonExtractAttributeDown = new System.Windows.Forms.Button();
+            this.textBoxExtractAttributeDefault = new System.Windows.Forms.TextBox();
             this.splitContainerC1vsC2 = new System.Windows.Forms.SplitContainer();
             this.groupBox5 = new System.Windows.Forms.GroupBox();
             this.dataGridViewFilters = new System.Windows.Forms.DataGridView();
@@ -68,7 +69,6 @@ namespace JSONExtractor
             this.openFileDialogSample = new System.Windows.Forms.OpenFileDialog();
             this.openFileDialogInputFiles = new System.Windows.Forms.OpenFileDialog();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
-            this.textBoxFilterPattern = new System.Windows.Forms.TextBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerTopVsBottom)).BeginInit();
             this.splitContainerTopVsBottom.Panel1.SuspendLayout();
             this.splitContainerTopVsBottom.Panel2.SuspendLayout();
@@ -285,6 +285,7 @@ namespace JSONExtractor
             this.treeViewJSON.Name = "treeViewJSON";
             this.treeViewJSON.Size = new System.Drawing.Size(234, 431);
             this.treeViewJSON.TabIndex = 0;
+            this.treeViewJSON.Click += new System.EventHandler(this.treeViewJSON_Click);
             // 
             // splitContainerFilterVsAttrControls
             // 
@@ -336,19 +337,29 @@ namespace JSONExtractor
             // 
             this.comboBoxFilterType.FormattingEnabled = true;
             this.comboBoxFilterType.Items.AddRange(new object[] {
-            "Matches",
+            "NumberEquals",
             "LessThanEqualTo",
             "GreaterThanEqualTo",
             "Empty",
-            "NonEmpty"});
+            "NonEmpty",
+            "Regex"});
             this.comboBoxFilterType.Location = new System.Drawing.Point(2, 1);
             this.comboBoxFilterType.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.comboBoxFilterType.Name = "comboBoxFilterType";
             this.comboBoxFilterType.Size = new System.Drawing.Size(108, 23);
             this.comboBoxFilterType.TabIndex = 0;
             // 
+            // textBoxFilterPattern
+            // 
+            this.textBoxFilterPattern.Location = new System.Drawing.Point(3, 28);
+            this.textBoxFilterPattern.Name = "textBoxFilterPattern";
+            this.textBoxFilterPattern.Size = new System.Drawing.Size(100, 23);
+            this.textBoxFilterPattern.TabIndex = 3;
+            this.textBoxFilterPattern.Text = "pattern";
+            // 
             // buttonFilterAdd
             // 
+            this.buttonFilterAdd.Enabled = false;
             this.buttonFilterAdd.Location = new System.Drawing.Point(2, 55);
             this.buttonFilterAdd.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.buttonFilterAdd.Name = "buttonFilterAdd";
@@ -356,9 +367,11 @@ namespace JSONExtractor
             this.buttonFilterAdd.TabIndex = 1;
             this.buttonFilterAdd.Text = "Add";
             this.buttonFilterAdd.UseVisualStyleBackColor = true;
+            this.buttonFilterAdd.Click += new System.EventHandler(this.buttonFilterAdd_Click);
             // 
             // buttonFilterRemove
             // 
+            this.buttonFilterRemove.Enabled = false;
             this.buttonFilterRemove.Location = new System.Drawing.Point(2, 79);
             this.buttonFilterRemove.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.buttonFilterRemove.Name = "buttonFilterRemove";
@@ -382,13 +395,13 @@ namespace JSONExtractor
             // 
             // flowLayoutPanel2
             // 
-            this.flowLayoutPanel2.Controls.Add(this.textBoxAttrLabel);
-            this.flowLayoutPanel2.Controls.Add(this.comboBoxAttrArrayRollup);
-            this.flowLayoutPanel2.Controls.Add(this.buttonAttrAdd);
-            this.flowLayoutPanel2.Controls.Add(this.buttonAttrRemove);
-            this.flowLayoutPanel2.Controls.Add(this.buttonAttrUp);
-            this.flowLayoutPanel2.Controls.Add(this.buttonAttrDown);
-            this.flowLayoutPanel2.Controls.Add(this.textBoxDefault);
+            this.flowLayoutPanel2.Controls.Add(this.textBoxExtractAttributeLabel);
+            this.flowLayoutPanel2.Controls.Add(this.comboBoxExtractAttributeAggregateType);
+            this.flowLayoutPanel2.Controls.Add(this.buttonAddExtractAttribute);
+            this.flowLayoutPanel2.Controls.Add(this.buttonExtractAttributeRemove);
+            this.flowLayoutPanel2.Controls.Add(this.buttonExtractAttributeUp);
+            this.flowLayoutPanel2.Controls.Add(this.buttonExtractAttributeDown);
+            this.flowLayoutPanel2.Controls.Add(this.textBoxExtractAttributeDefault);
             this.flowLayoutPanel2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.flowLayoutPanel2.Location = new System.Drawing.Point(2, 17);
             this.flowLayoutPanel2.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
@@ -396,19 +409,19 @@ namespace JSONExtractor
             this.flowLayoutPanel2.Size = new System.Drawing.Size(114, 205);
             this.flowLayoutPanel2.TabIndex = 2;
             // 
-            // textBoxAttrLabel
+            // textBoxExtractAttributeLabel
             // 
-            this.textBoxAttrLabel.Location = new System.Drawing.Point(2, 1);
-            this.textBoxAttrLabel.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.textBoxAttrLabel.Name = "textBoxAttrLabel";
-            this.textBoxAttrLabel.Size = new System.Drawing.Size(110, 23);
-            this.textBoxAttrLabel.TabIndex = 6;
-            this.textBoxAttrLabel.Text = "label";
+            this.textBoxExtractAttributeLabel.Location = new System.Drawing.Point(2, 1);
+            this.textBoxExtractAttributeLabel.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
+            this.textBoxExtractAttributeLabel.Name = "textBoxExtractAttributeLabel";
+            this.textBoxExtractAttributeLabel.Size = new System.Drawing.Size(110, 23);
+            this.textBoxExtractAttributeLabel.TabIndex = 6;
+            this.textBoxExtractAttributeLabel.Text = "label";
             // 
-            // comboBoxAttrArrayRollup
+            // comboBoxExtractAttributeAggregateType
             // 
-            this.comboBoxAttrArrayRollup.FormattingEnabled = true;
-            this.comboBoxAttrArrayRollup.Items.AddRange(new object[] {
+            this.comboBoxExtractAttributeAggregateType.FormattingEnabled = true;
+            this.comboBoxExtractAttributeAggregateType.Items.AddRange(new object[] {
             "Count",
             "Sum",
             "Mean",
@@ -417,59 +430,64 @@ namespace JSONExtractor
             "Max",
             "TableRows",
             "TableCols"});
-            this.comboBoxAttrArrayRollup.Location = new System.Drawing.Point(2, 26);
-            this.comboBoxAttrArrayRollup.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.comboBoxAttrArrayRollup.Name = "comboBoxAttrArrayRollup";
-            this.comboBoxAttrArrayRollup.Size = new System.Drawing.Size(108, 23);
-            this.comboBoxAttrArrayRollup.TabIndex = 2;
+            this.comboBoxExtractAttributeAggregateType.Location = new System.Drawing.Point(2, 26);
+            this.comboBoxExtractAttributeAggregateType.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
+            this.comboBoxExtractAttributeAggregateType.Name = "comboBoxExtractAttributeAggregateType";
+            this.comboBoxExtractAttributeAggregateType.Size = new System.Drawing.Size(108, 23);
+            this.comboBoxExtractAttributeAggregateType.TabIndex = 2;
             // 
-            // buttonAttrAdd
+            // buttonAddExtractAttribute
             // 
-            this.buttonAttrAdd.Location = new System.Drawing.Point(2, 51);
-            this.buttonAttrAdd.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.buttonAttrAdd.Name = "buttonAttrAdd";
-            this.buttonAttrAdd.Size = new System.Drawing.Size(81, 22);
-            this.buttonAttrAdd.TabIndex = 1;
-            this.buttonAttrAdd.Text = "Add";
-            this.buttonAttrAdd.UseVisualStyleBackColor = true;
+            this.buttonAddExtractAttribute.Enabled = false;
+            this.buttonAddExtractAttribute.Location = new System.Drawing.Point(2, 51);
+            this.buttonAddExtractAttribute.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
+            this.buttonAddExtractAttribute.Name = "buttonAddExtractAttribute";
+            this.buttonAddExtractAttribute.Size = new System.Drawing.Size(81, 22);
+            this.buttonAddExtractAttribute.TabIndex = 1;
+            this.buttonAddExtractAttribute.Text = "Add";
+            this.buttonAddExtractAttribute.UseVisualStyleBackColor = true;
+            this.buttonAddExtractAttribute.Click += new System.EventHandler(this.buttonAttrAdd_Click);
             // 
-            // buttonAttrRemove
+            // buttonExtractAttributeRemove
             // 
-            this.buttonAttrRemove.Location = new System.Drawing.Point(2, 75);
-            this.buttonAttrRemove.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.buttonAttrRemove.Name = "buttonAttrRemove";
-            this.buttonAttrRemove.Size = new System.Drawing.Size(81, 22);
-            this.buttonAttrRemove.TabIndex = 3;
-            this.buttonAttrRemove.Text = "Remove";
-            this.buttonAttrRemove.UseVisualStyleBackColor = true;
+            this.buttonExtractAttributeRemove.Enabled = false;
+            this.buttonExtractAttributeRemove.Location = new System.Drawing.Point(2, 75);
+            this.buttonExtractAttributeRemove.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
+            this.buttonExtractAttributeRemove.Name = "buttonExtractAttributeRemove";
+            this.buttonExtractAttributeRemove.Size = new System.Drawing.Size(81, 22);
+            this.buttonExtractAttributeRemove.TabIndex = 3;
+            this.buttonExtractAttributeRemove.Text = "Remove";
+            this.buttonExtractAttributeRemove.UseVisualStyleBackColor = true;
             // 
-            // buttonAttrUp
+            // buttonExtractAttributeUp
             // 
-            this.buttonAttrUp.Location = new System.Drawing.Point(2, 99);
-            this.buttonAttrUp.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.buttonAttrUp.Name = "buttonAttrUp";
-            this.buttonAttrUp.Size = new System.Drawing.Size(81, 22);
-            this.buttonAttrUp.TabIndex = 4;
-            this.buttonAttrUp.Text = "Up";
-            this.buttonAttrUp.UseVisualStyleBackColor = true;
+            this.buttonExtractAttributeUp.Enabled = false;
+            this.buttonExtractAttributeUp.Location = new System.Drawing.Point(2, 99);
+            this.buttonExtractAttributeUp.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
+            this.buttonExtractAttributeUp.Name = "buttonExtractAttributeUp";
+            this.buttonExtractAttributeUp.Size = new System.Drawing.Size(81, 22);
+            this.buttonExtractAttributeUp.TabIndex = 4;
+            this.buttonExtractAttributeUp.Text = "Up";
+            this.buttonExtractAttributeUp.UseVisualStyleBackColor = true;
             // 
-            // buttonAttrDown
+            // buttonExtractAttributeDown
             // 
-            this.buttonAttrDown.Location = new System.Drawing.Point(2, 123);
-            this.buttonAttrDown.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.buttonAttrDown.Name = "buttonAttrDown";
-            this.buttonAttrDown.Size = new System.Drawing.Size(81, 22);
-            this.buttonAttrDown.TabIndex = 5;
-            this.buttonAttrDown.Text = "Down";
-            this.buttonAttrDown.UseVisualStyleBackColor = true;
+            this.buttonExtractAttributeDown.Enabled = false;
+            this.buttonExtractAttributeDown.Location = new System.Drawing.Point(2, 123);
+            this.buttonExtractAttributeDown.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
+            this.buttonExtractAttributeDown.Name = "buttonExtractAttributeDown";
+            this.buttonExtractAttributeDown.Size = new System.Drawing.Size(81, 22);
+            this.buttonExtractAttributeDown.TabIndex = 5;
+            this.buttonExtractAttributeDown.Text = "Down";
+            this.buttonExtractAttributeDown.UseVisualStyleBackColor = true;
             // 
-            // textBoxDefault
+            // textBoxExtractAttributeDefault
             // 
-            this.textBoxDefault.Location = new System.Drawing.Point(3, 149);
-            this.textBoxDefault.Name = "textBoxDefault";
-            this.textBoxDefault.Size = new System.Drawing.Size(100, 23);
-            this.textBoxDefault.TabIndex = 7;
-            this.textBoxDefault.Text = "default";
+            this.textBoxExtractAttributeDefault.Location = new System.Drawing.Point(3, 149);
+            this.textBoxExtractAttributeDefault.Name = "textBoxExtractAttributeDefault";
+            this.textBoxExtractAttributeDefault.Size = new System.Drawing.Size(100, 23);
+            this.textBoxExtractAttributeDefault.TabIndex = 7;
+            this.textBoxExtractAttributeDefault.Text = "default";
             // 
             // splitContainerC1vsC2
             // 
@@ -579,14 +597,6 @@ namespace JSONExtractor
             this.openFileDialogInputFiles.ShowReadOnly = true;
             this.openFileDialogInputFiles.SupportMultiDottedExtensions = true;
             // 
-            // textBoxFilterPattern
-            // 
-            this.textBoxFilterPattern.Location = new System.Drawing.Point(3, 28);
-            this.textBoxFilterPattern.Name = "textBoxFilterPattern";
-            this.textBoxFilterPattern.Size = new System.Drawing.Size(100, 23);
-            this.textBoxFilterPattern.TabIndex = 3;
-            this.textBoxFilterPattern.Text = "pattern";
-            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -666,16 +676,16 @@ namespace JSONExtractor
         private System.Windows.Forms.Button buttonSaveConfig;
         private System.Windows.Forms.Button buttonLoadConfig;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel2;
-        private System.Windows.Forms.Button buttonAttrAdd;
-        private System.Windows.Forms.ComboBox comboBoxAttrArrayRollup;
-        private System.Windows.Forms.Button buttonAttrRemove;
-        private System.Windows.Forms.Button buttonAttrUp;
-        private System.Windows.Forms.Button buttonAttrDown;
+        private System.Windows.Forms.Button buttonAddExtractAttribute;
+        private System.Windows.Forms.ComboBox comboBoxExtractAttributeAggregateType;
+        private System.Windows.Forms.Button buttonExtractAttributeRemove;
+        private System.Windows.Forms.Button buttonExtractAttributeUp;
+        private System.Windows.Forms.Button buttonExtractAttributeDown;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel3;
         private System.Windows.Forms.Button buttonFilterAdd;
         private System.Windows.Forms.Button buttonFilterRemove;
-        private System.Windows.Forms.TextBox textBoxAttrLabel;
-        private System.Windows.Forms.TextBox textBoxDefault;
+        private System.Windows.Forms.TextBox textBoxExtractAttributeLabel;
+        private System.Windows.Forms.TextBox textBoxExtractAttributeDefault;
         private System.Windows.Forms.OpenFileDialog openFileDialogSample;
         private System.Windows.Forms.OpenFileDialog openFileDialogInputFiles;
         private System.Windows.Forms.ToolTip toolTip1;
