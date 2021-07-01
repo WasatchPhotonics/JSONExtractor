@@ -24,6 +24,11 @@ namespace JSONExtractor
                 re = new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
         }
 
+        public override string ToString()
+        {
+            return $"FilterAttribute({jsonFullPath}, {filterType}, {pattern})";
+        }
+
         /// <returns>
         /// True if value PASSES filter (i.e. the value should NOT be filtered-
         /// out or rejected)
