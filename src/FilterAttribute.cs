@@ -15,6 +15,7 @@ namespace JSONExtractor
         public string pattern { get; set; }
         public string jsonFullPath { get; set; }
         public int rejectCount { get; private set; }
+        public bool negate { get; set; }
 
         Regex re;
 
@@ -33,7 +34,7 @@ namespace JSONExtractor
         /// True if value PASSES filter (i.e. the value should NOT be filtered-
         /// out or rejected)
         /// </returns>
-        public bool passesFilter(string value)
+        public bool passesFilterUnnegated(string value)
         {
             // Empty, NonEmpty
             if (filterType == FilterType.Empty)
@@ -66,6 +67,12 @@ namespace JSONExtractor
             if (re != null && filterType == FilterType.Regex)
                 return re.Match(value) != null;
             return false;
+        }
+
+        public bool passesFilter(string value)
+        {
+            bool unnegated = passesFilterUnnegated(value);
+            return negate ? !unnegated : unnegated;
         }
     }
 }

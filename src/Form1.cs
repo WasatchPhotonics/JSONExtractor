@@ -14,22 +14,23 @@ namespace JSONExtractor
 {
     public partial class Form1 : Form
     {
-        IDictionary<string, object> treeRoot;
+        IDictionary<string, object> treeRoot;   // the object structure we generated from the loaded sample JSON (displayed on widget treeViewJSON)
 
-        BindingList<FilterAttribute> filterAttributes = new BindingList<FilterAttribute>();
-        BindingList<ExtractAttribute> extractAttributes = new BindingList<ExtractAttribute>();
+        BindingList<FilterAttribute> filterAttributes = new BindingList<FilterAttribute>();     // attributes we've chosen to filter
+        BindingList<ExtractAttribute> extractAttributes = new BindingList<ExtractAttribute>();  // attributes we've chosen to extract
         BindingSource filterBindingSource;
         BindingSource extractBindingSource;
 
         List<string> inputPathnames = new();
-        int filteredCount;
-        int extractedCount;
-        int processedCount;
 
-        string s3CacheDir;
-        bool s3SyncRunning;
+        int filteredCount;      // how many input records failed the filter and were skipped
+        int extractedCount;     // how many input records matched the filter and were extracted
+        int processedCount;     // how many input records have been processed
 
-        bool extractRunning;
+        string s3CacheDir;      // where to locally store files downloaded from S3
+        bool s3SyncRunning;     // is S3 currently syncing
+
+        bool extractRunning;    // is an extract currently running
 
         Logger logger = Logger.getInstance();
 
@@ -77,6 +78,11 @@ namespace JSONExtractor
             }
         }
 
+        /// <summary>
+        /// The user clicked the "Load Sample" button, so let them pick a JSON
+        /// file, load and it, then re-populate the "tree view" from its structure.
+        /// </summary>
+        /// <see cref="https://stackoverflow.com/a/31250524/6436775"/>
         private void buttonLoadSample_Click(object sender, EventArgs e)
         {
             treeRoot = null;
@@ -130,7 +136,8 @@ namespace JSONExtractor
         /// </summary>
         private void buttonFilterAdd_Click(object sender, EventArgs e)
         {
-            if (treeViewJSON.SelectedNode is null)
+            var tvn = treeViewJSON.SelectedNode; // "tree view node"
+            if (tvn is null)
                 return;
 
             // validate that "pattern" is appropriate for FilterType
@@ -164,14 +171,34 @@ namespace JSONExtractor
 
             var fa = new FilterAttribute()
             {
-                jsonFullPath = treeViewJSON.SelectedNode.FullPath,
+                jsonFullPath = tvn.FullPath,
                 filterType = filterType,
-                pattern = pattern
+                pattern = pattern,
+                negate = checkBoxFilterNegate.Checked
             };
             filterAttributes.Add(fa);
             filterBindingSource.ResetBindings(false);
         }
 
+        private void buttonFilterRemove_Click(object sender, EventArgs e)
+        {
+            var tvn = treeViewJSON.SelectedNode; // "tree view node"
+            if (tvn is null)
+                return;
+
+            foreach (var fa in filterAttributes)
+            {
+                if (fa.jsonFullPath == tvn.FullPath)
+                {
+                    filterAttributes.Remove(fa);
+                    logger.info($"removed filter attribute {tvn.FullPath}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determine whether we have met the necessary preconditions to start an extract.
+        /// </summary>
         void updateStartability()
         {
             buttonStart.Enabled = extractAttributes.Count > 0 && inputPathnames.Count > 0;
@@ -183,7 +210,7 @@ namespace JSONExtractor
         /// </summary>
         private void buttonAttrAdd_Click(object sender, EventArgs e)
         {
-            var tvn = treeViewJSON.SelectedNode;
+            var tvn = treeViewJSON.SelectedNode; // "tree view node"
             if (tvn is null)
                 return;
 
@@ -194,7 +221,7 @@ namespace JSONExtractor
             var ea = new ExtractAttribute()
             {
                 label = textBoxExtractAttributeLabel.Text,
-                jsonFullPath = treeViewJSON.SelectedNode.FullPath,
+                jsonFullPath = tvn.FullPath,
                 defaultValue = defaultValue
             };
 
@@ -204,6 +231,24 @@ namespace JSONExtractor
                     comboBoxExtractAttributeAggregateType.SelectedItem.ToString());
 
             extractAttributes.Add(ea);
+            extractBindingSource.ResetBindings(false);
+            updateStartability();
+        }
+
+        private void buttonExtractAttributeRemove_Click(object sender, EventArgs e)
+        {
+            var tvn = treeViewJSON.SelectedNode; // "tree view node"
+            if (tvn is null)
+                return;
+
+            foreach (var ea in extractAttributes)
+            {
+                if (ea.jsonFullPath == tvn.FullPath)
+                {
+                    extractAttributes.Remove(ea);
+                    logger.info($"Removed extract attribute {tvn.FullPath}");
+                }
+            }
             extractBindingSource.ResetBindings(false);
             updateStartability();
         }
@@ -221,7 +266,7 @@ namespace JSONExtractor
                 buttonFilterAdd.Enabled = false;
                 return;
             }
-            logger.debug("selected TreeView node {0}", tvn.FullPath);
+            logger.debug($"selected {tvn.FullPath}");
 
             buttonAddExtractAttribute.Enabled =
             buttonFilterAdd.Enabled = true;
@@ -259,6 +304,11 @@ namespace JSONExtractor
             labelProcessedCount.Text = "Processed: 0";
         }
 
+        /// <summary>
+        /// The user clicked the button to select an input directory, so let
+        /// them choose the directory and then read-in the list of .json files.
+        /// </summary>
+        /// <todo>create a file iterator...no need to actually keep these names in memory</todo>
         private void buttonSelectInputDir_Click(object sender, EventArgs e)
         {
             var result = folderBrowserDialogInputDir.ShowDialog();
@@ -267,11 +317,16 @@ namespace JSONExtractor
 
             inputPathnames = new List<string>();
             inputPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json"));
+            inputPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json.gz"));
+            inputPathnames.Sort();
             labelSelectedCount.Text = $"Selected: {inputPathnames.Count}";
             updateStartability();
             Properties.Settings.Default.inputDir = folderBrowserDialogInputDir.SelectedPath;
         }
-
+        
+        /// <summary>
+        /// Rather than select a whole directory, the user clicked the button to manually select one or more input files.
+        /// </summary>
         private void buttonSelectFiles_Click(object sender, EventArgs e)
         {
             var result = openFileDialogInputFiles.ShowDialog();
@@ -284,6 +339,9 @@ namespace JSONExtractor
             updateStartability();
         }
 
+        /// <summary>
+        /// The user clicked the button to start an extract.
+        /// </summary>
         private void buttonStart_Click(object sender, EventArgs e)
         {
             if (extractRunning)
@@ -298,6 +356,26 @@ namespace JSONExtractor
             }
         }
 
+        /// <summary>
+        /// The user clicked the button to select a directory to where S3 blobs
+        /// should be sync'd (sunk?), or alternately have already been sync'd
+        /// via awscli.
+        /// </summary>
+        private void buttonS3CacheDir_Click(object sender, EventArgs e)
+        {
+            var result = folderBrowserDialogInputDir.ShowDialog();
+            if (result != DialogResult.OK)
+                return;
+
+            s3CacheDir = folderBrowserDialogInputDir.SelectedPath;
+        }
+
+        private void buttonS3StartSync_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("S3 Sync not yet implemented");
+        }
+
+
         ////////////////////////////////////////////////////////////////////////
         //                                                                    //
         //                    Background Worker Extraction                    //
@@ -306,6 +384,7 @@ namespace JSONExtractor
 
         private void BackgroundWorkerExtraction_DoWork(object sender, DoWorkEventArgs e)
         {
+            // iterate over the selected input files
             for (int i = 0; i < inputPathnames.Count; i++)
             {
                 if (e.Cancel)
@@ -317,9 +396,9 @@ namespace JSONExtractor
                 var pathname = inputPathnames[i];
                 logger.debug($"loading {pathname}");
 
-                var jsonText = File.ReadAllText(pathname);
+                var jsonText = Util.loadText(pathname);
                 var jsonObj = JsonConvert.DeserializeObject<IDictionary<string, object>>(jsonText, new DictionaryConverter());
-
+                
                 foreach (var filterAttribute in filterAttributes)
                 {
                     logger.debug($"testing {filterAttribute}");
@@ -342,23 +421,5 @@ namespace JSONExtractor
             logger.info("Extraction completed");
         }
 
-        private void buttonExtractAttributeRemove_Click(object sender, EventArgs e)
-        {
-            updateStartability();
-        }
-
-        private void buttonS3CacheDir_Click(object sender, EventArgs e)
-        {
-            var result = folderBrowserDialogInputDir.ShowDialog();
-            if (result != DialogResult.OK)
-                return;
-
-            s3CacheDir = folderBrowserDialogInputDir.SelectedPath;
-        }
-
-        private void buttonS3StartSync_Click(object sender, EventArgs e)
-        {
-
-        }
     }
 }
