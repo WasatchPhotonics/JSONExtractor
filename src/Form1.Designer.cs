@@ -893,8 +893,8 @@ namespace JSONExtractor
             this.buttonExtractAttributeDown.Name = "buttonExtractAttributeDown";
             this.buttonExtractAttributeDown.Size = new System.Drawing.Size(92, 29);
             this.buttonExtractAttributeDown.TabIndex = 5;
-            this.buttonExtractAttributeDown.Text = "Right";
-            this.toolTip1.SetToolTip(this.buttonExtractAttributeDown, "Move the selected field right");
+            this.buttonExtractAttributeDown.Text = "Down";
+            this.toolTip1.SetToolTip(this.buttonExtractAttributeDown, "Move the selected field down");
             this.buttonExtractAttributeDown.UseVisualStyleBackColor = true;
             // 
             // buttonExtractAttributeUp
@@ -905,8 +905,8 @@ namespace JSONExtractor
             this.buttonExtractAttributeUp.Name = "buttonExtractAttributeUp";
             this.buttonExtractAttributeUp.Size = new System.Drawing.Size(92, 29);
             this.buttonExtractAttributeUp.TabIndex = 4;
-            this.buttonExtractAttributeUp.Text = "Left";
-            this.toolTip1.SetToolTip(this.buttonExtractAttributeUp, "Move the selected field left");
+            this.buttonExtractAttributeUp.Text = "Up";
+            this.toolTip1.SetToolTip(this.buttonExtractAttributeUp, "Move the selected field up");
             this.buttonExtractAttributeUp.UseVisualStyleBackColor = true;
             // 
             // buttonExtractAttributeRemove
@@ -1167,7 +1167,7 @@ namespace JSONExtractor
             // openFileDialogSample
             // 
             this.openFileDialogSample.DefaultExt = "json";
-            this.openFileDialogSample.Filter = "JSON files|*.json";
+            this.openFileDialogSample.Filter = "JSON files|*.json|GZ files|*.json.gz";
             this.openFileDialogSample.ShowReadOnly = true;
             // 
             // openFileDialogInputFiles

@@ -97,7 +97,7 @@ namespace JSONExtractor
             try
             {
                 logger.info($"loading {samplePathname}");
-                var jsonText = File.ReadAllText(samplePathname);
+                var jsonText = Util.loadText(samplePathname);
                 treeRoot = JsonConvert.DeserializeObject<IDictionary<string, object>>(jsonText, new DictionaryConverter());
                 toolTip1.SetToolTip(buttonLoadSample, samplePathname);
             }
@@ -535,7 +535,7 @@ namespace JSONExtractor
                         if (ea.isTable())
                             ea.storeTable(value, key);
                         else
-                            values.Add(formatValue(value));
+                            values.Add(ea.formatValue(value));
                     }
 
                     if (hasData)
