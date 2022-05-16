@@ -26,7 +26,7 @@ namespace JSONExtractor
         /// - TableRows : append to end of output as an independent row-ordered table
         /// - TableCols : append to end of output as an independent column-ordered table
         /// </summary>
-        public enum AggregateType { Count, Sum, Mean, StdDev, Min, Max, CommaDelimited, TableRows, TableCols };
+        public enum AggregateType { Count, Sum, Mean, StdDev, Min, Max, CommaDelimited, PipeDelimited, TableRows, TableCols };
 
         // public Properties are auto-populated to the bound DataGridView in definition order
         public string label { get; set; }
@@ -53,7 +53,7 @@ namespace JSONExtractor
                 return "";
             else if (obj is List<object>)
                 return formatAggregate(obj);
-            else if (obj is float)
+            else if (obj is float || obj is double)
                 return formatFloat((float)obj);
             else
                 return obj.ToString();
@@ -68,6 +68,23 @@ namespace JSONExtractor
             }
             else
                 return f.ToString();
+        }
+
+        /// <summary>
+        /// Probably a clever way to do this using LINQ.
+        /// </summary>
+        /// <param name="delim"></param>
+        /// <param name="values"></param>
+        /// <returns>values joined with delim using configured precision</returns>
+        string join(string delim, List<double> values)
+        {
+            if (values.Count == 0)
+                return "";
+
+            StringBuilder sb = new StringBuilder(formatFloat((float)values[0]));
+            for (int i = 1; i < values.Count; i++)
+                sb.Append(delim + formatFloat((float)values[i]));
+            return sb.ToString();
         }
 
         string formatAggregate(object obj)
@@ -86,12 +103,16 @@ namespace JSONExtractor
             if (aggregateType == AggregateType.Count)
                 return l.Count.ToString();
 
-            IEnumerable<float> values = l.Cast<float>();
+            List<double> values = l.OfType<double>().ToList();
+            if (values.Count == 0)
+                return formatFloat(0);
 
             if (aggregateType == AggregateType.CommaDelimited)
-                return string.Concat(values.Select(i => formatFloat(i)));
+                return join(",", values);
+            else if (aggregateType == AggregateType.PipeDelimited)
+                return join("|", values);
 
-            float result = 0;
+            double result = 0;
             if (aggregateType == AggregateType.Sum)
                 result = values.Sum();
             else if (aggregateType == AggregateType.Mean)
@@ -103,11 +124,13 @@ namespace JSONExtractor
             else if (aggregateType == AggregateType.StdDev)
                 result = Util.standardDeviation(values);
 
-            return formatFloat(result);
+            return formatFloat((float)result);
         }
 
         public void storeTable(object obj, string key)
         {
+            if (obj is null)
+                return;
             List<float> values = new List<float>();
             var l = (List<object>)obj;
             foreach (var x in l)

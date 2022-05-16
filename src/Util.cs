@@ -51,6 +51,10 @@ namespace JSONExtractor
                 for (int i = start; i < tok.Length; i++)
                 {
                     var key = tok[i];
+
+                    if (key.EndsWith("[]"))
+                        key = key.Substring(0, key.Length - 2);
+
                     if (node.ContainsKey(key))
                     {
                         if (i + 1 < tok.Length)
@@ -70,7 +74,7 @@ namespace JSONExtractor
         }
 
         /// <see href="https://stackoverflow.com/a/897463/11615696"/>
-        public static float standardDeviation(IEnumerable<float> valueList)
+        public static double standardDeviation(IEnumerable<double> valueList)
         {
             double M = 0.0;
             double S = 0.0;
@@ -82,7 +86,7 @@ namespace JSONExtractor
                 S += (value - tmpM) * (value - M);
                 k++;
             }
-            return (float)Math.Sqrt(S / (k - 2));
+            return Math.Sqrt(S / (k - 2));
         }
     }
 }

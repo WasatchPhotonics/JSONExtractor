@@ -1,14 +1,13 @@
 # Overview
 
 A simple GUI to let non-programmers query large sets of JSON documents, 
-whether stored on a filesystem or downloaded from an AWS S3 bucket.
+whether stored on a local filesystem or downloaded from an AWS S3 bucket.
 
-Programmers can generate ad-hoc queries using 
-[awscli](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/index.html)
-and [jq](https://stedolan.github.io/jq/),
-but many people interested in business or data analytics won't be comfortable 
-with those tools, and may prefer a flat CSV export they can readily load into
-Excel for crosstabs and charting.
+Programmers can of course query JSON repositories directly using command-line
+tools like [awscli](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/index.html)
+and [jq](https://stedolan.github.io/jq/), but many people interested in business
+or data analytics won't be comfortable with that interface, and may prefer a flat
+CSV export they can readily load into Excel for crosstabs and charting.
 
 ## What this is Not
 
@@ -19,9 +18,9 @@ internally on their data center, and then generating an extract file when
 processing completes (probably itself posted to a different S3 bucket, with a 
 download link emailed to the requesting user).
 
-And that would be a neatly encapsulated work-egg to contract out to an AWS web 
+That would be a neatly encapsulated work-egg to contract out to an AWS web 
 developer. You may consider this utility as a stop-gap measure, used to 
-demonstrate and refine the eventual cloud GUI and report-builder interface you'd
+demonstrate and refine an eventual cloud GUI and report-builder interface you'd
 like to provision.
 
 ## What this Is
@@ -38,9 +37,20 @@ So now there is one :-)
 
 # Backlog
 
+- add filename as implicit attribute for filtering
 - save/load configs (filter and extract sets)
 - before/after comparator for dates
 - progressBar for extract, sync
+
+# Architecture
+
+Obviously this is the kind of thing that would experience *dramatic* performance
+improvements through parallelization, ideally using some variant of map-reduce
+(Hadoop etc) to split the list of S3 keys across a dozen processing nodes.
+
+The lion's share of runtime is absolutely spent in ungzipping, then parsing
+the JSON blobs, which is why the ability to carefully pre-filter based on
+filename / key can be a game-changer.
 
 # Changelog
 

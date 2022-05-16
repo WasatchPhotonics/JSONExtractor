@@ -224,10 +224,11 @@ namespace JSONExtractor
             {
                 label = textBoxExtractAttributeLabel.Text,
                 jsonFullPath = tvn.FullPath,
-                defaultValue = defaultValue
+                defaultValue = defaultValue,
+                precision = (int)numericUpDownExtractAttributePrecision.Value
             };
 
-            if (tvn.Name.EndsWith("[]"))
+            if (tvn.Text.EndsWith("[]"))
                 ea.aggregateType = (ExtractAttribute.AggregateType)Enum.Parse(
                     typeof(ExtractAttribute.AggregateType),
                     comboBoxExtractAttributeAggregateType.SelectedItem.ToString());
@@ -288,7 +289,7 @@ namespace JSONExtractor
             buttonAddExtractAttribute.Enabled =
                 buttonFilterAdd.Enabled = true;
 
-            if (tvn.Name.EndsWith("[]"))
+            if (tvn.Text.EndsWith("[]"))
             {
                 // this is a List attribute, so let (make) them pick an
                 // aggregation method
@@ -528,7 +529,6 @@ namespace JSONExtractor
                     bool hasData = false;
                     foreach (var ea in extractAttributes)
                     {
-                        logger.debug($"extracting {ea}");
                         var value = Util.getJsonValue(jsonObj, ea.jsonFullPath, ea.defaultValue);
                         if (value != null)
                             hasData = true;

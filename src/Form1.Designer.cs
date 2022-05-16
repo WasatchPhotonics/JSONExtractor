@@ -280,6 +280,7 @@ namespace JSONExtractor
             this.buttonSelectFiles.TabIndex = 1;
             this.buttonSelectFiles.Text = "Select Files";
             this.buttonSelectFiles.UseVisualStyleBackColor = true;
+            this.buttonSelectFiles.Click += new System.EventHandler(this.buttonSelectFiles_Click);
             // 
             // buttonSelectInputDir
             // 
@@ -974,6 +975,8 @@ namespace JSONExtractor
             "StdDev",
             "Min",
             "Max",
+            "CommaDelimited",
+            "PipeDelimited",
             "TableRows",
             "TableCols"});
             this.comboBoxExtractAttributeAggregateType.Location = new System.Drawing.Point(88, 30);
@@ -1167,13 +1170,13 @@ namespace JSONExtractor
             // openFileDialogSample
             // 
             this.openFileDialogSample.DefaultExt = "json";
-            this.openFileDialogSample.Filter = "JSON files|*.json|GZ files|*.json.gz";
+            this.openFileDialogSample.Filter = "JSON files|*.json;*.json.gz";
             this.openFileDialogSample.ShowReadOnly = true;
             // 
             // openFileDialogInputFiles
             // 
             this.openFileDialogInputFiles.DefaultExt = "json";
-            this.openFileDialogInputFiles.Filter = "JSON files|*.json|GZ files|*.json.gz";
+            this.openFileDialogInputFiles.Filter = "JSON files|*.json;*.json.gz";
             this.openFileDialogInputFiles.Multiselect = true;
             this.openFileDialogInputFiles.ShowReadOnly = true;
             this.openFileDialogInputFiles.SupportMultiDottedExtensions = true;
