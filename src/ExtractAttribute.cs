@@ -162,22 +162,23 @@ namespace JSONExtractor
             }
             else if (aggregateType == AggregateType.TableCols)
             {
-                foreach (var key in tableKeys)
-                    sb.Append(key);
-                for (int i = 0; i < tableDimension; i++)
+                sb.AppendLine(String.Join(",", tableKeys));
+                for (int row = 0; row < tableDimension; row++)
                 {
-                    for (int j = 0; j < tableData.Count; i++)
+                    if (row < tableData[0].Count)
+                        sb.Append(formatDouble(tableData[0][row]));
+                    for (int col = 1; col < tableData.Count; col++)
                     {
-                        string value = "";
-                        if (i < tableData[j].Count)
-                            value = formatDouble(tableData[j][i]);
-                        sb.Append($", {value}");
+                        sb.Append(",");
+                        if (row < tableData[col].Count)
+                            sb.Append(formatDouble(tableData[col][row]));
                     }
-                    sb.Append(Environment.NewLine);
+                    sb.AppendLine();
                 }
             }
 
             tableData.Clear();
+            tableKeys.Clear();
             tableDimension = 0;
 
             return sb.ToString();
