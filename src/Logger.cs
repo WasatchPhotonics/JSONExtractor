@@ -271,7 +271,8 @@ namespace JSONExtractor
 
             lock (instance)
             {
-                Console.WriteLine(msg);
+                // Console.WriteLine(msg); .NET 4.x
+                System.Diagnostics.Debug.WriteLine(msg);
 
                 if (outfile != null && outfile.BaseStream != null)
                 {

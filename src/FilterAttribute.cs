@@ -9,18 +9,24 @@ namespace JSONExtractor
 {
     class FilterAttribute
     {
-        public enum FilterType { Regex, NumberEquals, LessThanEqualTo, GreaterThanEqualTo, Empty, NonEmpty }
+        public enum FilterType { Regex, NumberEquals, LessThanEqualTo, GreaterThanEqualTo, Empty, NonEmpty, DateBefore, DateAfter }
 
+        // public Properties are auto-populated to the bound DataGridView in definition order
+        public string name { get; private set; }
         public FilterType filterType { get; set; } = FilterType.NonEmpty;
         public string pattern { get; set; }
-        public string jsonFullPath { get; set; }
-        public int rejectCount { get; private set; }
-        public bool negate { get; set; }
+        public bool nullOk { get; set; }
+        public bool negate { get; set; }    
+        public bool sufficient { get; set; }
+        public int rejectCount { get; set; }
 
+        public string jsonFullPath;
         Regex re;
 
         public FilterAttribute()
         {
+            name = jsonFullPath.Split("\\").Last();
+
             if (filterType == FilterType.Regex)
                 re = new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
         }
@@ -34,7 +40,7 @@ namespace JSONExtractor
         /// True if value PASSES filter (i.e. the value should NOT be filtered-
         /// out or rejected)
         /// </returns>
-        public bool passesFilterUnnegated(string value)
+        private bool passesFilterUnnegated(string value)
         {
             // Empty, NonEmpty
             if (filterType == FilterType.Empty)
@@ -71,8 +77,20 @@ namespace JSONExtractor
 
         public bool passesFilter(string value)
         {
-            bool unnegated = passesFilterUnnegated(value);
-            return negate ? !unnegated : unnegated;
+            // first compute straight filter match
+            var pass = passesFilterUnnegated(value);
+
+            // negate if requested
+            if (negate)
+                pass = !pass;
+
+            // ignore failure if empty and nullOk
+            if (!pass && nullOk && (value is null || value.Length == 0))
+                pass = true;
+
+            if (!pass)
+                rejectCount++;
+            return pass;
         }
     }
 }

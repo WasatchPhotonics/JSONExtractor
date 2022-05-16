@@ -2,18 +2,160 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace JSONExtractor
 {
+    /// <summary>
+    /// Definition of  one attribute being output from the sample files.
+    /// </summary>
+    /// <remarks>
+    /// There are various ways we could save memory in TableRows and TableCols.  
+    /// TableRows could be cached to a tempfile as we go, then merely copied-over
+    /// at the end.  TableCols could be done the same way, then transposed during
+    /// final copy.  However, presumably they're going to open the CSV after
+    /// generation, so either they have the RAM or they don't.
+    /// </remarks>
     class ExtractAttribute
     {
-        public enum AggregateType { Scalar, Count, Sum, Mean, StdDev, Min, Max, TableRows, TableCols };
+        /// <summary>
+        /// Arrays in the JSON data can be aggregated (rolled-up) in extracts 
+        /// using any of the following functions.  Most are intuitive, but for
+        /// the rest:
+        /// 
+        /// - CommaDelimited : output the array as a comma-delimited string
+        /// - TableRows : append to end of output as an independent row-ordered table
+        /// - TableCols : append to end of output as an independent column-ordered table
+        /// </summary>
+        public enum AggregateType { Count, Sum, Mean, StdDev, Min, Max, CommaDelimited, TableRows, TableCols };
 
+        // public Properties are auto-populated to the bound DataGridView in definition order
         public string label { get; set; }
-        public string jsonFullPath { get; set; }
+        public int precision { get; set; }
         public string defaultValue { get; set; }
-        public AggregateType? aggregateType { get; set; }
+        public AggregateType? aggregateType { get; set; } = null;
+        public string jsonFullPath { get; set; }
+
+        List<List<float>> tableData = new List<List<float>>();
+        List<string> tableKeys = new List<string>();
+        int tableDimension = 0; // not all arrays (spectra, wavecal etc) may be of the same length
+
+        Logger logger = Logger.getInstance();
+
+        public bool isTable()
+        {
+            return aggregateType == AggregateType.TableCols ||
+                   aggregateType == AggregateType.TableRows;
+        }
+
+        public string formatValue(object obj)
+        {
+            if (obj is null)
+                return "";
+            else if (obj is List<object>)
+                return formatAggregate(obj);
+            else if (obj is float)
+                return formatFloat((float)obj);
+            else
+                return obj.ToString();
+        }
+
+        string formatFloat(float f)
+        {
+            if (precision >= 0)
+            {
+                Decimal dec = new Decimal(f);
+                return Decimal.Round(dec, precision).ToString();
+            }
+            else
+                return f.ToString();
+        }
+
+        string formatAggregate(object obj)
+        {
+            if (aggregateType is null)
+                return null;
+
+            if (aggregateType == AggregateType.TableCols || aggregateType == AggregateType.TableRows)
+            {
+                logger.error($"use storeValue() for {aggregateType}");
+                return null;
+            }
+
+            var l = (List<object>)obj;
+
+            if (aggregateType == AggregateType.Count)
+                return l.Count.ToString();
+
+            IEnumerable<float> values = l.Cast<float>();
+
+            if (aggregateType == AggregateType.CommaDelimited)
+                return string.Concat(values.Select(i => formatFloat(i)));
+
+            float result = 0;
+            if (aggregateType == AggregateType.Sum)
+                result = values.Sum();
+            else if (aggregateType == AggregateType.Mean)
+                result = values.Average();
+            else if (aggregateType == AggregateType.Min)
+                result = values.Min();
+            else if (aggregateType == AggregateType.Max)
+                result = values.Max();
+            else if (aggregateType == AggregateType.StdDev)
+                result = Util.standardDeviation(values);
+
+            return formatFloat(result);
+        }
+
+        public void storeTable(object obj, string key)
+        {
+            List<float> values = new List<float>();
+            var l = (List<object>)obj;
+            foreach (var x in l)
+                values.Add((float)x);
+            tableData.Add(values);
+            tableKeys.Add(key);
+            if (tableDimension < values.Count)
+                tableDimension = values.Count;
+        }
+
+        public string formatTable()
+        {
+            StringBuilder sb = new StringBuilder();
+            if (aggregateType == AggregateType.TableRows)
+            {
+                for (int i = 0; i < tableData.Count; i++)
+                {
+                    sb.Append(tableKeys[i]);
+                    for (int j = 0; j < tableData[i].Count; j++)
+                    {
+                        string value = formatFloat(tableData[i][j]);
+                        sb.Append($", {value}");
+                    }
+                    sb.Append(Environment.NewLine);
+                }
+            }
+            else if (aggregateType == AggregateType.TableCols)
+            {
+                foreach (var key in tableKeys)
+                    sb.Append(key);
+                for (int i = 0; i < tableDimension; i++)
+                {
+                    for (int j = 0; j < tableData.Count; i++)
+                    {
+                        string value = "";
+                        if (i < tableData[j].Count)
+                            value = formatFloat(tableData[j][i]);
+                        sb.Append($", {value}");
+                    }
+                    sb.Append(Environment.NewLine);
+                }
+            }
+
+            tableData.Clear();
+            tableDimension = 0;
+
+            return sb.ToString();
+        }
 
         public override string ToString()
         {

@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using Newtonsoft.Json;
 using System.IO;
@@ -26,11 +22,13 @@ namespace JSONExtractor
         int filteredCount;      // how many input records failed the filter and were skipped
         int extractedCount;     // how many input records matched the filter and were extracted
         int processedCount;     // how many input records have been processed
+        int skipCount;          // how many input records matched the filter but had no exportable data
 
         string s3CacheDir;      // where to locally store files downloaded from S3
-        bool s3SyncRunning;     // is S3 currently syncing
+        //bool s3SyncRunning;   // is S3 currently syncing
 
         bool extractRunning;    // is an extract currently running
+        StreamWriter outfile;   // where extracts are written
 
         Logger logger = Logger.getInstance();
 
@@ -78,6 +76,8 @@ namespace JSONExtractor
             }
         }
 
+        void saveSettings() => Properties.Settings.Default.Save();
+
         /// <summary>
         /// The user clicked the "Load Sample" button, so let them pick a JSON
         /// file, load and it, then re-populate the "tree view" from its structure.
@@ -107,11 +107,13 @@ namespace JSONExtractor
                 return;
             }
 
-            treeViewJSON.Nodes.Add(Path.GetFileName(samplePathname));
+            var rootNode = treeViewJSON.Nodes.Add("root");
 
             treeViewJSON.BeginUpdate();
             populateTreeView(treeRoot, treeViewJSON.Nodes[0]);
             treeViewJSON.EndUpdate();
+
+            rootNode.Expand();
         }
 
         // Traverse down the loaded JSON object tree starting at jsonNode, populating
@@ -254,12 +256,27 @@ namespace JSONExtractor
         }
 
         /// <summary>
+        /// Automatically add double-clicked tree nodes to the extract.
+        /// </summary>
+        private void treeViewJSON_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            if (e.Node is null)
+                return;
+            treeViewJSON.SelectedNode = e.Node;
+            buttonAttrAdd_Click(null, null);
+        }
+
+        /// <summary>
         /// The user has now selected an attribute in the JSON TreeView, so
         /// update the "add filter" and "add extract" regions accordingly.
         /// </summary>
         private void treeViewJSON_AfterSelect(object sender, TreeViewEventArgs e)
         {
-            var tvn = treeViewJSON.SelectedNode;
+            handleTreeNodeSelection(treeViewJSON.SelectedNode);
+        }
+
+        void handleTreeNodeSelection(TreeNode tvn)
+        { 
             if (tvn is null)
             {
                 buttonAddExtractAttribute.Enabled =
@@ -269,7 +286,7 @@ namespace JSONExtractor
             logger.debug($"selected {tvn.FullPath}");
 
             buttonAddExtractAttribute.Enabled =
-            buttonFilterAdd.Enabled = true;
+                buttonFilterAdd.Enabled = true;
 
             if (tvn.Name.EndsWith("[]"))
             {
@@ -285,7 +302,7 @@ namespace JSONExtractor
                 comboBoxExtractAttributeAggregateType.Enabled = false;
             }
 
-            var label = tvn.Name;
+            var label = tvn.Text;
             if (label.EndsWith("[]"))
                 label = label.Substring(0, label.Length - 2);
             textBoxExtractAttributeLabel.Text = label;
@@ -297,11 +314,21 @@ namespace JSONExtractor
             filteredCount = 0;
             extractedCount = 0;
             processedCount = 0;
+            skipCount = 0;
 
-            labelSelectedCount.Text = "Selected: 0";
-            labelFilteredCount.Text = "Filtered: 0";
-            labelExtractedCount.Text = "Extracted: 0";
-            labelProcessedCount.Text = "Processed: 0";
+            foreach (var fa in filterAttributes)
+                fa.rejectCount = 0;
+
+            updateFileCounts();
+        }
+
+        void updateFileCounts()
+        {
+            labelSelectedCount.Text = $"Selected: {inputPathnames.Count}";
+            labelFilteredCount.Text = $"Filtered: {filteredCount}";
+            labelExtractedCount.Text = $"Extracted: {extractedCount}";
+            labelProcessedCount.Text = $"Processed: {processedCount}";
+            labelSkippedCount.Text = $"Skipped: {skipCount}";
         }
 
         /// <summary>
@@ -322,8 +349,9 @@ namespace JSONExtractor
             labelSelectedCount.Text = $"Selected: {inputPathnames.Count}";
             updateStartability();
             Properties.Settings.Default.inputDir = folderBrowserDialogInputDir.SelectedPath;
+            saveSettings();
         }
-        
+
         /// <summary>
         /// Rather than select a whole directory, the user clicked the button to manually select one or more input files.
         /// </summary>
@@ -350,6 +378,15 @@ namespace JSONExtractor
             }
             else
             {
+                DialogResult result = saveFileDialogExtract.ShowDialog();
+                if (result != DialogResult.OK)
+                    return;
+
+                var pathname = saveFileDialogExtract.FileName;
+                logger.info($"generating extract to {pathname}");
+                outfile = new StreamWriter(pathname);
+                outfile.AutoFlush = true;
+
                 buttonStart.Text = "Stop";
                 extractRunning = true;
                 backgroundWorkerExtraction.RunWorkerAsync();
@@ -368,6 +405,18 @@ namespace JSONExtractor
                 return;
 
             s3CacheDir = folderBrowserDialogInputDir.SelectedPath;
+            Properties.Settings.Default.s3CacheDir = s3CacheDir;
+            saveSettings();
+        }
+
+        private void buttonSaveConfig_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Save Config not yet implemented");
+        }
+
+        private void buttonLoadConfig_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Load Config not yet implemented");
         }
 
         private void buttonS3StartSync_Click(object sender, EventArgs e)
@@ -375,6 +424,23 @@ namespace JSONExtractor
             MessageBox.Show("S3 Sync not yet implemented");
         }
 
+        private void textBoxS3Bucket_TextChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.s3Bucket = textBoxS3Bucket.Text;
+            saveSettings();
+        }
+
+        private void textBoxS3AccessKey_TextChanged(object sender, EventArgs e) 
+        {
+            Properties.Settings.Default.s3AccessKey = textBoxS3AccessKey.Text;
+            saveSettings();
+        }
+
+        private void textBoxS3SecretKey_TextChanged(object sender, EventArgs e) 
+        {
+            Properties.Settings.Default.s3SecretKey = textBoxS3SecretKey.Text;
+            saveSettings();
+        }
 
         ////////////////////////////////////////////////////////////////////////
         //                                                                    //
@@ -384,6 +450,15 @@ namespace JSONExtractor
 
         private void BackgroundWorkerExtraction_DoWork(object sender, DoWorkEventArgs e)
         {
+            // header row
+            List<string> headers = new List<string>();
+            foreach (var ea in extractAttributes)
+                if (!ea.isTable())
+                    headers.Add(ea.label);
+            outfile.WriteLine(string.Join(',', headers));
+
+            processedCount = 0;
+
             // iterate over the selected input files
             for (int i = 0; i < inputPathnames.Count; i++)
             {
@@ -396,20 +471,100 @@ namespace JSONExtractor
                 var pathname = inputPathnames[i];
                 logger.debug($"loading {pathname}");
 
+                var key = pathname.Split("\\").Last().Split(".").First();
+
                 var jsonText = Util.loadText(pathname);
                 var jsonObj = JsonConvert.DeserializeObject<IDictionary<string, object>>(jsonText, new DictionaryConverter());
-                
-                foreach (var filterAttribute in filterAttributes)
+
+                processedCount++;
+
+                bool passedAll = true;
+                bool metSufficiency = true;
+                foreach (var fa in filterAttributes)
                 {
-                    logger.debug($"testing {filterAttribute}");
+                    var value = Util.getJsonValue(jsonObj, fa.jsonFullPath);
+                    if (value is null)
+                    {
+                        if (fa.nullOk)
+                        {
+                            value = "";
+                        }
+                        else
+                        {
+                            passedAll = false;
+                            continue;
+                        }
+                    }
+                    var valueStr = value.ToString();
+                    bool passed = fa.passesFilter(valueStr);
+                    logger.debug($"filter({fa}, {valueStr}) -> {passed}");
+                    if (passed)
+                    {
+                        if (fa.sufficient)
+                        {
+                            metSufficiency = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        passedAll = false;
+                        // keep going, in case another filter is "sufficient"
+                    }
                 }
 
-                foreach (var extractAttribute in extractAttributes)
+                bool shouldExport = passedAll || metSufficiency;
+
+                if (!shouldExport)
                 {
-                    logger.debug($"extracting {extractAttribute}");
+                    logger.debug("$filtering {pathname}");
+                    filteredCount++;
+                    continue;
+                }
+                else
+                {
+                    // filters passed, so extract new record
+                    List<string> values = new List<string>();
+                    bool hasData = false;
+                    foreach (var ea in extractAttributes)
+                    {
+                        logger.debug($"extracting {ea}");
+                        var value = Util.getJsonValue(jsonObj, ea.jsonFullPath, ea.defaultValue);
+                        if (value != null)
+                            hasData = true;
+                        if (ea.isTable())
+                            ea.storeTable(value, key);
+                        else
+                            values.Add(formatValue(value));
+                    }
+
+                    if (hasData)
+                    {
+                        outfile.WriteLine(string.Join(',', values));
+                        extractedCount++;
+                    }
+                    else
+                    {
+                        logger.debug($"skipping {pathname} (filters passed but no data to extract)");
+                        skipCount++;
+                    }
+                }
+                labelExtractedCount.BeginInvoke(new MethodInvoker(delegate { updateFileCounts(); }));
+            }
+
+            // if this extract had any tabular attributes, append them at the bottom
+            foreach (var ea in extractAttributes)
+            {
+                if (ea.isTable())
+                {
+                    outfile.WriteLine();
+                    outfile.WriteLine($"[{ea.label}]");
+                    outfile.WriteLine(ea.formatTable());
                 }
             }
+
             logger.info("Extraction done");
+            outfile.Close();
         }
 
         private void BackgroundWorkerExtraction_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -420,6 +575,5 @@ namespace JSONExtractor
         {
             logger.info("Extraction completed");
         }
-
     }
 }
