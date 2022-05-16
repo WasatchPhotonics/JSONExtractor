@@ -41,6 +41,7 @@ So now there is one :-)
 - save/load configs (filter and extract sets)
 - before/after comparator for dates
 - progressBar for extract, sync
+- interpolate spectral data to fixed x-axis
 
 # Architecture
 

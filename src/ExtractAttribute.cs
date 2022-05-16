@@ -35,7 +35,7 @@ namespace JSONExtractor
         public AggregateType? aggregateType { get; set; } = null;
         public string jsonFullPath { get; set; }
 
-        List<List<float>> tableData = new List<List<float>>();
+        List<List<double>> tableData = new List<List<double>>();
         List<string> tableKeys = new List<string>();
         int tableDimension = 0; // not all arrays (spectra, wavecal etc) may be of the same length
 
@@ -54,20 +54,20 @@ namespace JSONExtractor
             else if (obj is List<object>)
                 return formatAggregate(obj);
             else if (obj is float || obj is double)
-                return formatFloat((float)obj);
+                return formatDouble((double)obj);
             else
                 return obj.ToString();
         }
 
-        string formatFloat(float f)
+        string formatDouble(double d)
         {
             if (precision >= 0)
             {
-                Decimal dec = new Decimal(f);
+                Decimal dec = new Decimal(d);
                 return Decimal.Round(dec, precision).ToString();
             }
             else
-                return f.ToString();
+                return d.ToString();
         }
 
         /// <summary>
@@ -81,9 +81,9 @@ namespace JSONExtractor
             if (values.Count == 0)
                 return "";
 
-            StringBuilder sb = new StringBuilder(formatFloat((float)values[0]));
+            StringBuilder sb = new StringBuilder(formatDouble(values[0]));
             for (int i = 1; i < values.Count; i++)
-                sb.Append(delim + formatFloat((float)values[i]));
+                sb.Append(delim + formatDouble(values[i]));
             return sb.ToString();
         }
 
@@ -105,7 +105,7 @@ namespace JSONExtractor
 
             List<double> values = l.OfType<double>().ToList();
             if (values.Count == 0)
-                return formatFloat(0);
+                return formatDouble(0);
 
             if (aggregateType == AggregateType.CommaDelimited)
                 return join(",", values);
@@ -124,17 +124,20 @@ namespace JSONExtractor
             else if (aggregateType == AggregateType.StdDev)
                 result = Util.standardDeviation(values);
 
-            return formatFloat((float)result);
+            return formatDouble(result);
         }
 
         public void storeTable(object obj, string key)
         {
             if (obj is null)
                 return;
-            List<float> values = new List<float>();
+
             var l = (List<object>)obj;
-            foreach (var x in l)
-                values.Add((float)x);
+            if (l.Count == 0)
+                return;
+
+            List<double> values = l.OfType<double>().ToList();
+
             tableData.Add(values);
             tableKeys.Add(key);
             if (tableDimension < values.Count)
@@ -151,7 +154,7 @@ namespace JSONExtractor
                     sb.Append(tableKeys[i]);
                     for (int j = 0; j < tableData[i].Count; j++)
                     {
-                        string value = formatFloat(tableData[i][j]);
+                        string value = formatDouble(tableData[i][j]);
                         sb.Append($", {value}");
                     }
                     sb.Append(Environment.NewLine);
@@ -167,7 +170,7 @@ namespace JSONExtractor
                     {
                         string value = "";
                         if (i < tableData[j].Count)
-                            value = formatFloat(tableData[j][i]);
+                            value = formatDouble(tableData[j][i]);
                         sb.Append($", {value}");
                     }
                     sb.Append(Environment.NewLine);

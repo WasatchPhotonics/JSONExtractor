@@ -143,6 +143,7 @@ namespace JSONExtractor
                 return;
 
             // validate that "pattern" is appropriate for FilterType
+            // todo: move to FilterAttribute
             string pattern = textBoxFilterPattern.Text;
             var filterType = (FilterAttribute.FilterType)Enum.Parse(typeof(FilterAttribute.FilterType), comboBoxFilterType.SelectedItem.ToString());
             switch (filterType)
@@ -564,7 +565,6 @@ namespace JSONExtractor
             }
 
             logger.info("Extraction done");
-            outfile.Close();
         }
 
         private void BackgroundWorkerExtraction_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -574,6 +574,9 @@ namespace JSONExtractor
         private void BackgroundWorkerExtraction_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             logger.info("Extraction completed");
+            outfile.Close();
+            buttonStart.Text = "Start";
+            extractRunning = false;
         }
     }
 }
