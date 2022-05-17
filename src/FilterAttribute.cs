@@ -12,7 +12,7 @@ namespace JSONExtractor
         public enum FilterType { Regex, NumberEquals, LessThanEqualTo, GreaterThanEqualTo, Empty, NonEmpty, DateBefore, DateAfter }
 
         // public Properties are auto-populated to the bound DataGridView in definition order
-        public string name { get; private set; }
+        public string name { get; set; }
         public FilterType filterType { get; set; } = FilterType.NonEmpty;
         public string pattern { get; set; }
         public bool nullOk { get; set; }

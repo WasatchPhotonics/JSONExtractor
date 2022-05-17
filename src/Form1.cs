@@ -31,10 +31,14 @@ namespace JSONExtractor
         bool extractRunning;    // is an extract currently running
         StreamWriter outfile;   // where extracts are written
 
-        DateTime timeStart;
         List<double> recentCompletionTimesSec = new List<double>();
+        const int COMPLETION_TIMES_WINDOW = 100;
 
         Logger logger = Logger.getInstance();
+
+        ////////////////////////////////////////////////////////////////////////
+        // Lifecycle
+        ////////////////////////////////////////////////////////////////////////
 
         public Form1()
         {
@@ -59,9 +63,33 @@ namespace JSONExtractor
             backgroundWorkerExtraction.ProgressChanged += BackgroundWorkerExtraction_ProgressChanged;
             backgroundWorkerExtraction.RunWorkerCompleted += BackgroundWorkerExtraction_RunWorkerCompleted;
 
-            // balance GUI
+        }
+
+        // balance GUI (Visual Studio keeps resizing things)
+        void configureSplitContainers()
+        {
+            //    1   2  1      4    = 8
+            //  +--+----+--+--------+
+            //  |A |  B |C |    D   |
+            //  +--+----+--+--------+
+            var w8 = (int)(Width / 8);
+            splitContainerTabsVsJSONOnward.SplitterDistance = w8;               // (A, BCD)
+            splitContainerJSONandButtonsVsDatagrids.SplitterDistance = w8 * 3;  // (BC, D)
+            splitContainerTreeVsOpts.SplitterDistance = w8 * 2;                 // (B, C)
+
             splitContainerFilterVsAttrControls.SplitterDistance = splitContainerFilterVsAttrControls.Height / 2;
             splitContainerFilterVsAttributeTables.SplitterDistance = splitContainerFilterVsAttributeTables.Height / 2;
+
+            foreach (var splitter in new SplitContainer[] {
+                    splitContainerTabsVsJSONOnward,
+                    splitContainerJSONandButtonsVsDatagrids,
+                    splitContainerTreeVsOpts,
+                    splitContainerFilterVsAttrControls,
+                    splitContainerFilterVsAttributeTables })
+            {
+                splitter.IsSplitterFixed = false;
+                splitter.FixedPanel = FixedPanel.None;
+            }
         }
 
         void initFromSettings()
@@ -85,6 +113,10 @@ namespace JSONExtractor
         }
 
         void saveSettings() => Properties.Settings.Default.Save();
+
+        ////////////////////////////////////////////////////////////////////////
+        // JSON Template
+        ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
         /// The user clicked the "Load Sample" button, so let them pick a JSON
@@ -150,6 +182,60 @@ namespace JSONExtractor
         }
 
         /// <summary>
+        /// Automatically add double-clicked tree nodes to the extract.
+        /// </summary>
+        private void treeViewJSON_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            if (e.Node is null)
+                return;
+            treeViewJSON.SelectedNode = e.Node;
+            buttonAttrAdd_Click(null, null);
+        }
+
+        /// <summary>
+        /// The user has now selected an attribute in the JSON TreeView, so
+        /// update the "add filter" and "add extract" regions accordingly.
+        /// </summary>
+        private void treeViewJSON_AfterSelect(object sender, TreeViewEventArgs e)
+        {
+            TreeNode tvn = treeViewJSON.SelectedNode;
+            if (tvn is null)
+            {
+                buttonAddExtractAttribute.Enabled =
+                    buttonFilterAdd.Enabled = false;
+                return;
+            }
+            logger.debug($"selected {tvn.FullPath}");
+
+            buttonAddExtractAttribute.Enabled =
+                buttonFilterAdd.Enabled = true;
+
+            if (tvn.Text.EndsWith("[]"))
+            {
+                // this is a List attribute, so let (make) them pick an
+                // aggregation method
+                comboBoxExtractAttributeAggregateType.SelectedIndex = 0;
+                comboBoxExtractAttributeAggregateType.Enabled = true;
+            }
+            else
+            {
+                // deselect aggregation
+                comboBoxExtractAttributeAggregateType.SelectedIndex = -1;
+                comboBoxExtractAttributeAggregateType.Enabled = false;
+            }
+
+            var label = tvn.Text;
+            if (label.EndsWith("[]"))
+                label = label.Substring(0, label.Length - 2);
+            textBoxExtractAttributeLabel.Text = label;
+            textBoxExtractAttributeDefault.Text = "";
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // Filters
+        ////////////////////////////////////////////////////////////////////////
+
+        /// <summary>
         /// The user clicked the button to add the selected JSON TreeView Node
         /// to the list of FilterAttributes.
         /// </summary>
@@ -195,29 +281,21 @@ namespace JSONExtractor
             filterBindingSource.ResetBindings(false);
         }
 
-        private void buttonFilterRemove_Click(object sender, EventArgs e)
-        {
-            var tvn = treeViewJSON.SelectedNode; // "tree view node"
-            if (tvn is null)
-                return;
-
-            foreach (var fa in filterAttributes)
-            {
-                if (fa.jsonFullPath == tvn.FullPath)
-                {
-                    filterAttributes.Remove(fa);
-                    logger.info($"removed filter attribute {tvn.FullPath}");
-                }
-            }
-        }
-
         /// <summary>
         /// Determine whether we have met the necessary preconditions to start an extract.
         /// </summary>
         void updateStartability()
         {
-            buttonStart.Enabled = extractAttributes.Count > 0 && inputPathnames.Count > 0;
+            var haveAttr = extractAttributes.Count > 0;
+            buttonStart.Enabled = haveAttr && inputPathnames.Count > 0;
+
+            buttonExtractAttributeDown.Enabled =
+            buttonExtractAttributeUp.Enabled = haveAttr;
         }
+
+        ////////////////////////////////////////////////////////////////////////
+        // Extract Attributes
+        ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
         /// The user clicked the button to add the selected JSON TreeView Node
@@ -251,77 +329,36 @@ namespace JSONExtractor
             updateStartability();
         }
 
-        private void buttonExtractAttributeRemove_Click(object sender, EventArgs e)
+        private void dataGridViewAttributes_RowsRemoved(object sender, DataGridViewRowsRemovedEventArgs e)
         {
-            var tvn = treeViewJSON.SelectedNode; // "tree view node"
-            if (tvn is null)
-                return;
-
-            foreach (var ea in extractAttributes)
-            {
-                if (ea.jsonFullPath == tvn.FullPath)
-                {
-                    extractAttributes.Remove(ea);
-                    logger.info($"Removed extract attribute {tvn.FullPath}");
-                }
-            }
-            extractBindingSource.ResetBindings(false);
             updateStartability();
         }
 
-        /// <summary>
-        /// Automatically add double-clicked tree nodes to the extract.
-        /// </summary>
-        private void treeViewJSON_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+        private void buttonExtractAttributeUp_Click(object sender, EventArgs e)
         {
-            if (e.Node is null)
+            var row = dataGridViewAttributes.CurrentCell.RowIndex;
+            if (row < 1)
                 return;
-            treeViewJSON.SelectedNode = e.Node;
-            buttonAttrAdd_Click(null, null);
+            var ea = extractAttributes[row];
+            extractAttributes.RemoveAt(row);
+            extractAttributes.Insert(row - 1, ea);
+            // dataGridViewAttributes.Rows[row - 1].Selected = true;
         }
 
-        /// <summary>
-        /// The user has now selected an attribute in the JSON TreeView, so
-        /// update the "add filter" and "add extract" regions accordingly.
-        /// </summary>
-        private void treeViewJSON_AfterSelect(object sender, TreeViewEventArgs e)
+        private void buttonExtractAttributeDown_Click(object sender, EventArgs e)
         {
-            handleTreeNodeSelection(treeViewJSON.SelectedNode);
-        }
-
-        void handleTreeNodeSelection(TreeNode tvn)
-        { 
-            if (tvn is null)
-            {
-                buttonAddExtractAttribute.Enabled =
-                buttonFilterAdd.Enabled = false;
+            var row = dataGridViewAttributes.CurrentCell.RowIndex;
+            if (row + 1 >= extractAttributes.Count)
                 return;
-            }
-            logger.debug($"selected {tvn.FullPath}");
-
-            buttonAddExtractAttribute.Enabled =
-                buttonFilterAdd.Enabled = true;
-
-            if (tvn.Text.EndsWith("[]"))
-            {
-                // this is a List attribute, so let (make) them pick an
-                // aggregation method
-                comboBoxExtractAttributeAggregateType.SelectedIndex = 0;
-                comboBoxExtractAttributeAggregateType.Enabled = true;
-            }
-            else
-            {
-                // deselect aggregation
-                comboBoxExtractAttributeAggregateType.SelectedIndex = -1;
-                comboBoxExtractAttributeAggregateType.Enabled = false;
-            }
-
-            var label = tvn.Text;
-            if (label.EndsWith("[]"))
-                label = label.Substring(0, label.Length - 2);
-            textBoxExtractAttributeLabel.Text = label;
-            textBoxExtractAttributeDefault.Text = "";
+            var ea = extractAttributes[row];
+            extractAttributes.RemoveAt(row);
+            extractAttributes.Insert(row + 1, ea);
+            // dataGridViewAttributes.Rows[row + 1].Selected = true;
         }
+
+        ////////////////////////////////////////////////////////////////////////
+        // Running an Extract
+        ////////////////////////////////////////////////////////////////////////
 
         void clearFileCounts()
         {
@@ -333,7 +370,6 @@ namespace JSONExtractor
             foreach (var fa in filterAttributes)
                 fa.rejectCount = 0;
 
-            timeStart = DateTime.Now;
             progressBarStatus.Maximum = inputPathnames.Count;
             progressBarStatus.Value = 0;
 
@@ -350,7 +386,6 @@ namespace JSONExtractor
 
             progressBarStatus.Value = processedCount;
 
-            // var secPerRec = (DateTime.Now - timeStart).TotalSeconds / processedCount;
             string tt = "unknown time remaining";
             if (recentCompletionTimesSec.Count > 0)
             {
@@ -426,6 +461,24 @@ namespace JSONExtractor
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////
+        // Saved Configurations
+        ////////////////////////////////////////////////////////////////////////
+
+        private void buttonSaveConfig_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Save Config not yet implemented");
+        }
+
+        private void buttonLoadConfig_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Load Config not yet implemented");
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // AWS S3
+        ////////////////////////////////////////////////////////////////////////
+
         /// <summary>
         /// The user clicked the button to select a directory to where S3 blobs
         /// should be sync'd (sunk?), or alternately have already been sync'd
@@ -440,16 +493,6 @@ namespace JSONExtractor
             s3CacheDir = folderBrowserDialogInputDir.SelectedPath;
             Properties.Settings.Default.s3CacheDir = s3CacheDir;
             saveSettings();
-        }
-
-        private void buttonSaveConfig_Click(object sender, EventArgs e)
-        {
-            MessageBox.Show("Save Config not yet implemented");
-        }
-
-        private void buttonLoadConfig_Click(object sender, EventArgs e)
-        {
-            MessageBox.Show("Load Config not yet implemented");
         }
 
         private void buttonS3StartSync_Click(object sender, EventArgs e)
@@ -537,10 +580,11 @@ namespace JSONExtractor
                 if (i > 0)
                 {
                     var elapsedSec = (DateTime.Now - lastStart).TotalSeconds;
-                    while (recentCompletionTimesSec.Count >= 100)
+                    while (recentCompletionTimesSec.Count >= COMPLETION_TIMES_WINDOW)
                         recentCompletionTimesSec.RemoveAt(0);
                     recentCompletionTimesSec.Add(elapsedSec);
                 }
+                lastStart = DateTime.Now;
 
                 var pathname = inputPathnames[i];
                 processedCount++;
@@ -595,7 +639,7 @@ namespace JSONExtractor
                 bool shouldExport = passedAll || sufficient;
                 if (!shouldExport)
                 {
-                    logger.debug("$filtering {pathname}");
+                    // logger.debug($"filtering {pathname}");
                     filteredCount++;
                     updateFileCountsDelegate();
                     continue;
@@ -662,6 +706,19 @@ namespace JSONExtractor
             buttonStart.Text = "Start";
             extractRunning = false;
             progressBarStatus.Value = 0;
+        }
+
+        private void dataGridViewAttributes_SelectionChanged(object sender, EventArgs e)
+        {
+            var rows = dataGridViewAttributes.SelectedRows;
+            if (rows.Count == 0)
+            {
+                logger.debug($"no rows selected");
+            }
+            else
+            {
+                logger.debug($"Attribute rows selected: {rows}");
+            }
         }
     }
 }
