@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using Newtonsoft.Json;
 using System.IO;
+using System.Threading;
 
 namespace JSONExtractor
 {
@@ -30,6 +31,9 @@ namespace JSONExtractor
         bool extractRunning;    // is an extract currently running
         StreamWriter outfile;   // where extracts are written
 
+        DateTime timeStart;
+        List<double> recentCompletionTimesSec = new List<double>();
+
         Logger logger = Logger.getInstance();
 
         public Form1()
@@ -54,6 +58,10 @@ namespace JSONExtractor
             backgroundWorkerExtraction.DoWork += BackgroundWorkerExtraction_DoWork;
             backgroundWorkerExtraction.ProgressChanged += BackgroundWorkerExtraction_ProgressChanged;
             backgroundWorkerExtraction.RunWorkerCompleted += BackgroundWorkerExtraction_RunWorkerCompleted;
+
+            // balance GUI
+            splitContainerFilterVsAttrControls.SplitterDistance = splitContainerFilterVsAttrControls.Height / 2;
+            splitContainerFilterVsAttributeTables.SplitterDistance = splitContainerFilterVsAttributeTables.Height / 2;
         }
 
         void initFromSettings()
@@ -107,10 +115,14 @@ namespace JSONExtractor
                 return;
             }
 
+            // special case for filename-based matching (allows fast pruning of
+            // input pathnames without gunzipping, loading and parsing JSON)
+            treeViewJSON.Nodes.Add("filename");
+
             var rootNode = treeViewJSON.Nodes.Add("root");
 
             treeViewJSON.BeginUpdate();
-            populateTreeView(treeRoot, treeViewJSON.Nodes[0]);
+            populateTreeView(treeRoot, rootNode);
             treeViewJSON.EndUpdate();
 
             rootNode.Expand();
@@ -124,7 +136,12 @@ namespace JSONExtractor
             {
                 object value = jsonNode[key];
                 if (value is IDictionary<string, object> dict)
-                    populateTreeView(dict, treeNode.Nodes.Add(key));
+                {
+                    if (dict.Count > 0)
+                        populateTreeView(dict, treeNode.Nodes.Add(key));
+                    else
+                        logger.debug($"ignoring empty JSON dict {key}");
+                }
                 else if (value is List<object>)
                     treeNode.Nodes.Add(key + "[]");
                 else
@@ -145,7 +162,8 @@ namespace JSONExtractor
             // validate that "pattern" is appropriate for FilterType
             // todo: move to FilterAttribute
             string pattern = textBoxFilterPattern.Text;
-            var filterType = (FilterAttribute.FilterType)Enum.Parse(typeof(FilterAttribute.FilterType), comboBoxFilterType.SelectedItem.ToString());
+            var filterType = (FilterAttribute.FilterType)Enum.Parse(
+                typeof(FilterAttribute.FilterType), comboBoxFilterType.SelectedItem.ToString());
             switch (filterType)
             {
                 case FilterAttribute.FilterType.Regex:
@@ -172,13 +190,7 @@ namespace JSONExtractor
                     break;
             }
 
-            var fa = new FilterAttribute()
-            {
-                jsonFullPath = tvn.FullPath,
-                filterType = filterType,
-                pattern = pattern,
-                negate = checkBoxFilterNegate.Checked
-            };
+            var fa = new FilterAttribute(tvn.FullPath, filterType, pattern, checkBoxFilterNegate.Checked);
             filterAttributes.Add(fa);
             filterBindingSource.ResetBindings(false);
         }
@@ -321,6 +333,10 @@ namespace JSONExtractor
             foreach (var fa in filterAttributes)
                 fa.rejectCount = 0;
 
+            timeStart = DateTime.Now;
+            progressBarStatus.Maximum = inputPathnames.Count;
+            progressBarStatus.Value = 0;
+
             updateFileCounts();
         }
 
@@ -331,6 +347,18 @@ namespace JSONExtractor
             labelExtractedCount.Text = $"Extracted: {extractedCount}";
             labelProcessedCount.Text = $"Processed: {processedCount}";
             labelSkippedCount.Text = $"Skipped: {skipCount}";
+
+            progressBarStatus.Value = processedCount;
+
+            // var secPerRec = (DateTime.Now - timeStart).TotalSeconds / processedCount;
+            string tt = "unknown time remaining";
+            if (recentCompletionTimesSec.Count > 0)
+            {
+                var secPerRec = recentCompletionTimesSec.Average();
+                var secRemaining = (inputPathnames.Count - processedCount) * secPerRec;
+                tt = Util.timeRemainingLabel(secRemaining);
+            }
+            toolTip1.SetToolTip(progressBarStatus, tt);
         }
 
         /// <summary>
@@ -391,6 +419,9 @@ namespace JSONExtractor
 
                 buttonStart.Text = "Stop";
                 extractRunning = true;
+
+                clearFileCounts();
+
                 backgroundWorkerExtraction.RunWorkerAsync();
             }
         }
@@ -450,8 +481,28 @@ namespace JSONExtractor
         //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
+        /// <returns>
+        /// Tuple of (passed, sufficient) where "passed" indicates "this" filter,
+        /// and "sufficient" means "the overall filter set passes regardless of 
+        /// other filters.
+        /// </returns>
+        bool filterPasses(FilterAttribute fa, object value)
+        {
+            if (value is null)
+                return fa.nullOk;
+
+            var valueStr = value.ToString();
+            bool passed = fa.passesFilter(valueStr);
+            // logger.debug($"filter({fa}, {valueStr}) -> {passed}");
+            return passed;
+        }
+
+        void updateFileCountsDelegate() => labelExtractedCount.BeginInvoke(new MethodInvoker(delegate { updateFileCounts(); }));
+
         private void BackgroundWorkerExtraction_DoWork(object sender, DoWorkEventArgs e)
         {
+            var worker = sender as BackgroundWorker;
+
             // header row
             List<string> headers = new List<string>();
             foreach (var ea in extractAttributes)
@@ -461,16 +512,67 @@ namespace JSONExtractor
 
             processedCount = 0;
 
+            // group filters by type
+            List<FilterAttribute> filenameFilters = new List<FilterAttribute>();
+            List<FilterAttribute> jsonFilters = new List<FilterAttribute>();
+            foreach (var fa in filterAttributes)
+                if (fa.isFilenameFilter)
+                    filenameFilters.Add(fa);
+                else
+                    jsonFilters.Add(fa);
+
+            DateTime lastStart = DateTime.Now;
+
             // iterate over the selected input files
             for (int i = 0; i < inputPathnames.Count; i++)
             {
-                if (e.Cancel)
+                if (worker.CancellationPending)
                 {
                     logger.info("Extraction cancelled");
-                    return;
+                    e.Cancel = true;
+                    break;
+                }
+
+                // track recent times to smooth progressBar
+                if (i > 0)
+                {
+                    var elapsedSec = (DateTime.Now - lastStart).TotalSeconds;
+                    while (recentCompletionTimesSec.Count >= 100)
+                        recentCompletionTimesSec.RemoveAt(0);
+                    recentCompletionTimesSec.Add(elapsedSec);
                 }
 
                 var pathname = inputPathnames[i];
+                processedCount++;
+
+                ////////////////////////////////////////////////////////////////
+                // test filename
+                ////////////////////////////////////////////////////////////////
+
+                bool passedAll = true;
+                bool sufficient = false;
+                foreach (var fa in filenameFilters)
+                {
+                    var value = Path.GetFileName(pathname).Split(".").First();
+                    var passed = filterPasses(fa, value);
+                    if (!passed)
+                        passedAll = false;
+                    if (passed && fa.sufficient)
+                        sufficient = true;
+                }
+
+                bool shouldLoad = passedAll || sufficient;
+                if (!shouldLoad)
+                { 
+                    // for speed, don't log or update the GUI on these
+                    skipCount++;
+                    continue;
+                }
+
+                ////////////////////////////////////////////////////////////////
+                // test record
+                ////////////////////////////////////////////////////////////////
+
                 logger.debug($"loading {pathname}");
 
                 var key = pathname.Split("\\").Last().Split(".").First();
@@ -478,79 +580,61 @@ namespace JSONExtractor
                 var jsonText = Util.loadText(pathname);
                 var jsonObj = JsonConvert.DeserializeObject<IDictionary<string, object>>(jsonText, new DictionaryConverter());
 
-                processedCount++;
-
-                bool passedAll = true;
-                bool metSufficiency = true;
-                foreach (var fa in filterAttributes)
+                passedAll = true;
+                sufficient = false;
+                foreach (var fa in jsonFilters)
                 {
                     var value = Util.getJsonValue(jsonObj, fa.jsonFullPath);
-                    if (value is null)
-                    {
-                        if (fa.nullOk)
-                        {
-                            value = "";
-                        }
-                        else
-                        {
-                            passedAll = false;
-                            continue;
-                        }
-                    }
-                    var valueStr = value.ToString();
-                    bool passed = fa.passesFilter(valueStr);
-                    logger.debug($"filter({fa}, {valueStr}) -> {passed}");
-                    if (passed)
-                    {
-                        if (fa.sufficient)
-                        {
-                            metSufficiency = true;
-                            break;
-                        }
-                    }
-                    else
-                    {
+                    var passed = filterPasses(fa, value);
+                    if (!passed)
                         passedAll = false;
-                        // keep going, in case another filter is "sufficient"
-                    }
+                    if (passed && fa.sufficient)
+                        sufficient = true;
                 }
 
-                bool shouldExport = passedAll || metSufficiency;
-
+                bool shouldExport = passedAll || sufficient;
                 if (!shouldExport)
                 {
                     logger.debug("$filtering {pathname}");
                     filteredCount++;
+                    updateFileCountsDelegate();
                     continue;
                 }
-                else
-                {
-                    // filters passed, so extract new record
-                    List<string> values = new List<string>();
-                    bool hasData = false;
-                    foreach (var ea in extractAttributes)
-                    {
-                        var value = Util.getJsonValue(jsonObj, ea.jsonFullPath, ea.defaultValue);
-                        if (value != null)
-                            hasData = true;
-                        if (ea.isTable())
-                            ea.storeTable(value, key);
-                        else
-                            values.Add(ea.formatValue(value));
-                    }
 
-                    if (hasData)
-                    {
-                        outfile.WriteLine(string.Join(',', values));
-                        extractedCount++;
-                    }
+                ////////////////////////////////////////////////////////////////
+                // extract fields
+                ////////////////////////////////////////////////////////////////
+
+                // filters passed, so extract new record
+                List<string> values = new List<string>();
+                bool hasData = false;
+                foreach (var ea in extractAttributes)
+                {
+                    var value = Util.getJsonValue(jsonObj, ea.jsonFullPath, ea.defaultValue);
+                    if (value != null)
+                        hasData = true;
+                    
+                    if (ea.isTable())
+                        ea.storeTable(value, key);
                     else
-                    {
-                        logger.debug($"skipping {pathname} (filters passed but no data to extract)");
-                        skipCount++;
-                    }
+                        values.Add(ea.formatValue(value));
                 }
-                labelExtractedCount.BeginInvoke(new MethodInvoker(delegate { updateFileCounts(); }));
+
+                if (!hasData)
+                {
+                    logger.debug($"skipping {pathname} (filters passed but no data to extract)");
+                    skipCount++;
+                    updateFileCountsDelegate();
+                    continue;
+                }
+
+                ////////////////////////////////////////////////////////////////
+                // export record
+                ////////////////////////////////////////////////////////////////
+
+                outfile.WriteLine(string.Join(',', values));
+                extractedCount++;
+                updateFileCountsDelegate();
             }
 
             // if this extract had any tabular attributes, append them at the bottom
@@ -577,6 +661,7 @@ namespace JSONExtractor
             outfile.Close();
             buttonStart.Text = "Start";
             extractRunning = false;
+            progressBarStatus.Value = 0;
         }
     }
 }

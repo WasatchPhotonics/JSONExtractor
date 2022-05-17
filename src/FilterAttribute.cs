@@ -22,13 +22,31 @@ namespace JSONExtractor
 
         public string jsonFullPath;
         Regex re;
+        DateTime dateThreshold;
+        bool dateValid = false;
+        public bool isFilenameFilter;
 
-        public FilterAttribute()
+        Logger logger = Logger.getInstance();
+
+        public FilterAttribute(string jsonFullPath, FilterType filterType, string pattern, bool negate)
         {
+            this.jsonFullPath = jsonFullPath;
+            this.filterType = filterType;
+            this.pattern = pattern;
+            this.negate = negate;
+
+            isFilenameFilter = (jsonFullPath == "filename");
             name = jsonFullPath.Split("\\").Last();
 
             if (filterType == FilterType.Regex)
                 re = new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+            if (filterType == FilterType.DateAfter || filterType == FilterType.DateBefore)
+            {
+                dateValid = DateTime.TryParse(pattern, out dateThreshold);
+                if (!dateValid)
+                    logger.error("unable to parse date field: {pattern}");
+            }
         }
 
         public override string ToString()
@@ -71,7 +89,25 @@ namespace JSONExtractor
 
             // Regex 
             if (re != null && filterType == FilterType.Regex)
-                return re.Match(value) != null;
+                return re.Match(value).Success;
+
+            if (dateValid)
+            {
+                DateTime date;
+                if (DateTime.TryParse(value, out date))
+                {
+                    if (filterType == FilterType.DateBefore)
+                        return date < dateThreshold;
+                    else // filterType == FilterType.DateAfter
+                        return dateThreshold < date;
+                }
+                else
+                {
+                    logger.error($"unable to parse date {value} (treating as null)");
+                    return nullOk;
+                }
+            }
+
             return false;
         }
 

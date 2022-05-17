@@ -88,5 +88,21 @@ namespace JSONExtractor
             }
             return Math.Sqrt(S / (k - 2));
         }
+
+        public static string timeRemainingLabel(double totalSec)
+        {
+            int hours = (int)Math.Floor(totalSec / 3600);
+            if (hours > 1)
+            {
+                int mins = (int)Math.Ceiling((totalSec - (hours * 3600)) / 60.0);
+                return $"{hours}hr {mins}min remaining";
+            }
+            else
+            {
+                int mins = (int)Math.Floor(totalSec / 60.0);
+                int secs = (int)Math.Ceiling(totalSec - (mins * 60));
+                return $"{mins}min {secs}sec remaining";
+            }
+        }
     }
 }

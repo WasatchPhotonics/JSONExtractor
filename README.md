@@ -37,10 +37,9 @@ So now there is one :-)
 
 # Backlog
 
+- before/after comparator for dates
 - add filename as implicit attribute for filtering
 - save/load configs (filter and extract sets)
-- before/after comparator for dates
-- progressBar for extract, sync
 - interpolate spectral data to fixed x-axis
 
 # Architecture
