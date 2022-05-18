@@ -18,6 +18,8 @@ namespace JSONExtractor
         BindingSource filterBindingSource;
         BindingSource extractBindingSource;
 
+        string interpolationCoefficientsJSONPath;
+
         List<string> selectedPathnames = new();
         List<string> dedupedPathnames = new();
 
@@ -303,14 +305,54 @@ namespace JSONExtractor
         /// </summary>
         private void buttonAttrAdd_Click(object sender, EventArgs e)
         {
+            // this is the actual attribute we're going to extract
+            var ea = generateExtractAttributeFromSelectedJSONNode();
+
+            // if interpolation is enabled, store the path to the coeffs we're to use for interpolating THIS ExtractAttribute
+            if (checkBoxInterpolate.Checked)
+            {
+                ea.interpolate = true;
+                ea.interpolationCoeffsFullPath = interpolationCoefficientsJSONPath;
+                ea.interpolationStart = (int)numericUpDownInterpolationStart.Value;
+                ea.interpolationEnd   = (int)numericUpDownInterpolationEnd.Value;
+                ea.interpolationIncr  = (float)numericUpDownInterpolationIncr.Value;
+            }
+
+            extractAttributes.Add(ea);
+            extractBindingSource.ResetBindings(false);
+            updateStartability();
+        }
+
+        /// <summary>
+        /// The user clicked "Use Coeffs", so use the currently-selected 
+        /// JSON array attribute as the polynomial coefficients we will use
+        /// in interpolating other aggregate data (e.g. spectra) against the
+        /// generated x-axis.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void buttonUseCoefficients_Click(object sender, EventArgs e)
+        {
+            var ea = generateExtractAttributeFromSelectedJSONNode();
+            if (ea.aggregateType is null)
+            {
+                logger.error("Coefficients must be an array type");
+                return;
+            }
+
+            interpolationCoefficientsJSONPath = ea.jsonFullPath;
+        }
+
+        ExtractAttribute generateExtractAttributeFromSelectedJSONNode()
+        {
             var tvn = treeViewJSON.SelectedNode; // "tree view node"
             if (tvn is null)
-                return;
+                return null;
 
             if (tvn.Nodes.Count > 0)
             {
                 logger.error("adding dict nodes to report is not currently supported");
-                return;
+                return null;
             }
 
             var defaultValue = textBoxExtractAttributeDefault.Text;
@@ -330,9 +372,7 @@ namespace JSONExtractor
                     typeof(ExtractAttribute.AggregateType),
                     comboBoxExtractAttributeAggregateType.SelectedItem.ToString());
 
-            extractAttributes.Add(ea);
-            extractBindingSource.ResetBindings(false);
-            updateStartability();
+            return ea;
         }
 
         private void dataGridViewAttributes_RowsRemoved(object sender, DataGridViewRowsRemovedEventArgs e)
@@ -631,7 +671,7 @@ namespace JSONExtractor
                     break;
                 }
 
-                // track recent times to smooth progressBar
+                // track recent processing times for progressBar
                 if (i > 0)
                 {
                     var elapsedSec = (DateTime.Now - lastStart).TotalSeconds;
@@ -712,9 +752,11 @@ namespace JSONExtractor
                     var value = Util.getJsonValue(jsonObj, ea.jsonFullPath, ea.defaultValue);
                     if (value != null)
                         hasData = true;
-                    
+
+                    // pass jsonObj so the ExtractAttribute can find its
+                    // coefficients if interpolation is called for
                     if (ea.isTable())
-                        ea.storeTable(value, key);
+                        ea.storeTable(value, key, jsonObj);
                     else
                         values.Add(ea.formatValue(value));
                 }
@@ -775,5 +817,11 @@ namespace JSONExtractor
                 logger.debug($"Attribute rows selected: {rows}");
             }
         }
+
+        private void checkBoxInterpolate_CheckedChanged(object sender, EventArgs e)
+        {
+
+        }
+
     }
 }

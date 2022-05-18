@@ -47,35 +47,30 @@ namespace JSONExtractor
             {
                 int start = 0;
                 if (tok[0] == "root")
-                    start = 1;
+                    start = 1; // skip artificial "root" tier
+
                 for (int i = start; i < tok.Length; i++)
                 {
                     var key = tok[i];
-
                     if (key.EndsWith("[]"))
                         key = key.Substring(0, key.Length - 2);
 
-                    if (node is null)
-                    {
-                        return defaultValue;
-                    }
-                    else if (node.ContainsKey(key))
-                    {
-                        if (i + 1 < tok.Length)
-                            node = (IDictionary<string, object>)node[key];
-                        else
-                            result = node[key];
-                    }
-                    else
-                    {
+                    if (node is null || !node.ContainsKey(key))
                         break;
-                    }
+
+                    // are we at the last node?
+                    if (i + 1 == tok.Length)
+                        return node[key];
+
+                    // traverse to the next JSON node
+                    node = (IDictionary<string, object>)node[key];
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                logger.error($"can't find {tok} in node: {ex}");
+                logger.error($"exception finding {tok} in node: {ex}");
             }
+            logger.error($"can't find {tok} in node");
             return result;
         }
 

@@ -34,10 +34,16 @@ namespace JSONExtractor
         public string defaultValue { get; set; }
         public AggregateType? aggregateType { get; set; } = null;
         public string jsonFullPath { get; set; }
+        public bool interpolate { get; set; }
 
         List<List<double>> tableData = new List<List<double>>();
         List<string> tableKeys = new List<string>();
         int tableDimension = 0; // not all arrays (spectra, wavecal etc) may be of the same length
+
+        public string interpolationCoeffsFullPath; // jsonFullPath to the coefficients array used for interpolation
+        public int interpolationStart;
+        public int interpolationEnd;
+        public float interpolationIncr;
 
         Logger logger = Logger.getInstance();
 
@@ -127,7 +133,16 @@ namespace JSONExtractor
             return formatDouble(result);
         }
 
-        public void storeTable(object obj, string key)
+        /// <summary>
+        /// Rather than output a single value into an ongoing extract, we've been
+        /// asked to store a set of values (presumably a 1-dimensional array)
+        /// for later output as a 2D table at the end of the extract.
+        /// </summary>
+        /// <remarks>
+        /// We need to perform interpolation here, since each record may have its
+        /// own calibration coefficients.
+        /// </remarks>
+        public void storeTable(object obj, string key, IDictionary<string, object> jsonObj = null)
         {
             if (obj is null)
                 return;
@@ -137,6 +152,9 @@ namespace JSONExtractor
                 return;
 
             List<double> values = l.OfType<double>().ToList();
+
+            if (interpolate && jsonObj != null)
+                values = interpolateValues(values, jsonObj);
 
             tableData.Add(values);
             tableKeys.Add(key);
@@ -188,5 +206,59 @@ namespace JSONExtractor
         {
             return $"ExtractAttribute({label} ({jsonFullPath}), default {defaultValue}, aggregateType {aggregateType})";
         }
+
+        ////////////////////////////////////////////////////////////////////////
+        // Interpolation
+        ////////////////////////////////////////////////////////////////////////
+
+        List<double> getCoefficients(IDictionary<string, object> jsonObj)
+        {
+            var value = Util.getJsonValue(jsonObj, interpolationCoeffsFullPath);
+            if (value is null)
+                return null;
+
+            var l = (List<object>)jsonObj;
+            List<double> values = l.OfType<double>().ToList();
+            if (values.Count == 0)
+                return null;
+
+            return values;
+        }
+
+        double evaluatePolynomial(double x, List<double> coeffs)
+        {
+            // compromise between length, performance and reusability
+            double result = 0;
+            if (coeffs.Count >= 1) result  = coeffs[0];
+            if (coeffs.Count >= 2) result += coeffs[1] * x;
+            if (coeffs.Count >= 3) result += coeffs[2] * coeffs[2] * x;
+            if (coeffs.Count >= 4) result += coeffs[3] * coeffs[3] * coeffs[3] * x;
+            if (coeffs.Count >= 5) result += coeffs[4] * coeffs[4] * coeffs[4] * coeffs[4]  * x;
+            for (int i = 5; i < coeffs.Count; i++)
+                result += x * Math.Pow(coeffs[i], i);
+            return result;
+        }
+
+        /// <summary>
+        /// Interpolate this 1D array to the specified arithmetic x-axis.
+        /// </summary>
+        List<double> interpolateValues(List<double> a, IDictionary<string, object> jsonObj)
+        {
+            List<double> coeffs = getCoefficients(jsonObj);
+            List<double> oldX = new List<double>(a.Count);
+            for (int i = 0; i < a.Count; i++)
+                oldX.Add(evaluatePolynomial(i, coeffs));
+            Interpolator interp = new Interpolator(oldX, a);
+            int step = 0;
+            List<double> newY = new();
+            double x = interpolationStart;
+            while (x <= interpolationEnd)
+            {
+                newY.Add(interp.interpolate(interpolationStart + step * interpolationIncr));
+                step++;
+            }
+            return newY;
+        }
+
     }
 }
