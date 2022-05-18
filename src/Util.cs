@@ -55,7 +55,11 @@ namespace JSONExtractor
                     if (key.EndsWith("[]"))
                         key = key.Substring(0, key.Length - 2);
 
-                    if (node.ContainsKey(key))
+                    if (node is null)
+                    {
+                        return defaultValue;
+                    }
+                    else if (node.ContainsKey(key))
                     {
                         if (i + 1 < tok.Length)
                             node = (IDictionary<string, object>)node[key];
@@ -63,7 +67,9 @@ namespace JSONExtractor
                             result = node[key];
                     }
                     else
+                    {
                         break;
+                    }
                 }
             }
             catch(Exception ex)

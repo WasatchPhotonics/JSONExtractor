@@ -5,7 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using Newtonsoft.Json;
 using System.IO;
-using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace JSONExtractor
 {
@@ -18,7 +18,8 @@ namespace JSONExtractor
         BindingSource filterBindingSource;
         BindingSource extractBindingSource;
 
-        List<string> inputPathnames = new();
+        List<string> selectedPathnames = new();
+        List<string> dedupedPathnames = new();
 
         int filteredCount;      // how many input records failed the filter and were skipped
         int extractedCount;     // how many input records matched the filter and were extracted
@@ -62,11 +63,10 @@ namespace JSONExtractor
             backgroundWorkerExtraction.DoWork += BackgroundWorkerExtraction_DoWork;
             backgroundWorkerExtraction.ProgressChanged += BackgroundWorkerExtraction_ProgressChanged;
             backgroundWorkerExtraction.RunWorkerCompleted += BackgroundWorkerExtraction_RunWorkerCompleted;
-
         }
 
-        // balance GUI (Visual Studio keeps resizing things)
-        void configureSplitContainers()
+        // balance GUI (Visual Studio keeps resizing things?)
+        void configureSplitContainers_NOT_USED()
         {
             //    1   2  1      4    = 8
             //  +--+----+--+--------+
@@ -287,7 +287,7 @@ namespace JSONExtractor
         void updateStartability()
         {
             var haveAttr = extractAttributes.Count > 0;
-            buttonStart.Enabled = haveAttr && inputPathnames.Count > 0;
+            buttonStart.Enabled = haveAttr && dedupedPathnames.Count > 0;
 
             buttonExtractAttributeDown.Enabled =
             buttonExtractAttributeUp.Enabled = haveAttr;
@@ -306,6 +306,12 @@ namespace JSONExtractor
             var tvn = treeViewJSON.SelectedNode; // "tree view node"
             if (tvn is null)
                 return;
+
+            if (tvn.Nodes.Count > 0)
+            {
+                logger.error("adding dict nodes to report is not currently supported");
+                return;
+            }
 
             var defaultValue = textBoxExtractAttributeDefault.Text;
             if (defaultValue.Length == 0)
@@ -357,7 +363,7 @@ namespace JSONExtractor
         }
 
         ////////////////////////////////////////////////////////////////////////
-        // Running an Extract
+        // Select Input Files
         ////////////////////////////////////////////////////////////////////////
 
         void clearFileCounts()
@@ -370,7 +376,7 @@ namespace JSONExtractor
             foreach (var fa in filterAttributes)
                 fa.rejectCount = 0;
 
-            progressBarStatus.Maximum = inputPathnames.Count;
+            progressBarStatus.Maximum = dedupedPathnames.Count;
             progressBarStatus.Value = 0;
 
             updateFileCounts();
@@ -378,7 +384,8 @@ namespace JSONExtractor
 
         void updateFileCounts()
         {
-            labelSelectedCount.Text = $"Selected: {inputPathnames.Count}";
+            labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
+            labelDedupedCount.Text = $"Deduped: {dedupedPathnames.Count}";
             labelFilteredCount.Text = $"Filtered: {filteredCount}";
             labelExtractedCount.Text = $"Extracted: {extractedCount}";
             labelProcessedCount.Text = $"Processed: {processedCount}";
@@ -390,7 +397,7 @@ namespace JSONExtractor
             if (recentCompletionTimesSec.Count > 0)
             {
                 var secPerRec = recentCompletionTimesSec.Average();
-                var secRemaining = (inputPathnames.Count - processedCount) * secPerRec;
+                var secRemaining = (dedupedPathnames.Count - processedCount) * secPerRec;
                 tt = Util.timeRemainingLabel(secRemaining);
             }
             toolTip1.SetToolTip(progressBarStatus, tt);
@@ -407,14 +414,14 @@ namespace JSONExtractor
             if (result != DialogResult.OK)
                 return;
 
-            inputPathnames = new List<string>();
-            inputPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json"));
-            inputPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json.gz"));
-            inputPathnames.Sort();
-            labelSelectedCount.Text = $"Selected: {inputPathnames.Count}";
-            updateStartability();
             Properties.Settings.Default.inputDir = folderBrowserDialogInputDir.SelectedPath;
             saveSettings();
+
+            selectedPathnames = new List<string>();
+            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json"));
+            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json.gz"));
+
+            dedupeInputPathnames();
         }
 
         /// <summary>
@@ -426,11 +433,49 @@ namespace JSONExtractor
             if (result != DialogResult.OK)
                 return;
 
-            inputPathnames = new List<string>();
-            inputPathnames.AddRange(openFileDialogInputFiles.FileNames);
-            labelSelectedCount.Text = $"Selected: {inputPathnames.Count}";
+            selectedPathnames = new List<string>();
+            selectedPathnames.AddRange(openFileDialogInputFiles.FileNames);
+
+            dedupeInputPathnames();
+        }
+
+        void dedupeInputPathnames()
+        {
+            selectedPathnames.Sort();
+            labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
+
+            if (checkBoxDedupeFilenames.Checked)
+            {
+                var re = new Regex(textBoxDedupeFilenames.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                Dictionary<string, string> latestUnique = new Dictionary<string, string>();
+                foreach (var pathname in selectedPathnames)
+                {
+                    var basename = Path.GetFileName(pathname).Split(".").First();
+                    var match = re.Match(basename);
+                    if (match.Success && match.Groups.Count > 1)
+                    {
+                        var unique = match.Groups[1].Value;
+                        latestUnique[unique] = pathname;
+                    }
+                    else
+                    {
+                        // we didn't match the pattern, so just store the pathname directly
+                        latestUnique[basename] = pathname;
+                    }
+                }
+                dedupedPathnames = new();
+                foreach (var pair in latestUnique)
+                    dedupedPathnames.Add(pair.Value);
+                dedupedPathnames.Sort();
+            }
+
+            labelDedupedCount.Text = $"Deduped: {dedupedPathnames.Count}";
             updateStartability();
         }
+
+        ////////////////////////////////////////////////////////////////////////
+        // Running an Extract
+        ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
         /// The user clicked the button to start an extract.
@@ -546,12 +591,22 @@ namespace JSONExtractor
         {
             var worker = sender as BackgroundWorker;
 
-            // header row
-            List<string> headers = new List<string>();
+            // header rows
+            List<string> headersLong = new List<string>();
+            List<string> headersShort = new List<string>();
             foreach (var ea in extractAttributes)
+            {
                 if (!ea.isTable())
-                    headers.Add(ea.label);
-            outfile.WriteLine(string.Join(',', headers));
+                {
+                    string full = ea.jsonFullPath;
+                    if (full.StartsWith("root\\"))
+                        full = full.Substring(5);
+                    headersLong.Add(full);
+                    headersShort.Add(ea.label);
+                }
+            }
+            outfile.WriteLine(string.Join(',', headersLong));
+            outfile.WriteLine(string.Join(',', headersShort));
 
             processedCount = 0;
 
@@ -566,8 +621,8 @@ namespace JSONExtractor
 
             DateTime lastStart = DateTime.Now;
 
-            // iterate over the selected input files
-            for (int i = 0; i < inputPathnames.Count; i++)
+            // iterate over the deduped input files
+            for (int i = 0; i < dedupedPathnames.Count; i++)
             {
                 if (worker.CancellationPending)
                 {
@@ -586,7 +641,7 @@ namespace JSONExtractor
                 }
                 lastStart = DateTime.Now;
 
-                var pathname = inputPathnames[i];
+                var pathname = dedupedPathnames[i];
                 processedCount++;
 
                 ////////////////////////////////////////////////////////////////

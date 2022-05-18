@@ -1,5 +1,8 @@
 # Changelog
 
+- 2022-05-18
+    - added filename filtering
+    - added de-duping
 - 2022-05-16
     - added double-click
     - basic extracts work
