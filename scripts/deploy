@@ -1,0 +1,28 @@
+#!/bin/bash
+
+PROJ="JSONExtractor"
+
+function postAndRename()
+{
+    LOCAL_PATH="SetupAnyCPU/Debug/${PROJ}-x.y.z-Setup64.msi"
+
+    REMOTE_NAME="${PROJ}-${VERSION}-Setup64.msi"
+    REMOTE_PATH="www/binaries/apps/${PROJ}/$REMOTE_NAME"
+
+    scp $LOCAL_PATH $USERNAME@wasatchphotonics.com:$REMOTE_PATH
+}
+
+read -p "Username:   " USERNAME
+read -p "Version:    " VERSION 
+
+# verify version number is tagged
+if git tag | egrep -q $VERSION
+then
+    echo "Git tag found"
+else
+    echo "Git tag not found: $VERSION"
+    exit 1
+fi
+
+# upload installers
+postAndRename 
