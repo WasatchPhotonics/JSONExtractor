@@ -19,6 +19,7 @@ namespace JSONExtractor
         BindingSource extractBindingSource;
 
         string interpolationCoefficientsJSONPath;
+        string interpolationExcitationJSONPath;
 
         List<string> selectedPathnames = new();
         List<string> dedupedPathnames = new();
@@ -49,6 +50,8 @@ namespace JSONExtractor
             logger.setTextBox(textBoxEventLog);
             logger.level = Logger.LogLevel.DEBUG;
 
+            configureSplitContainers();
+
             filterBindingSource = new BindingSource(filterAttributes, null);
             extractBindingSource = new BindingSource(extractAttributes, null);
 
@@ -68,7 +71,7 @@ namespace JSONExtractor
         }
 
         // balance GUI (Visual Studio keeps resizing things?)
-        void configureSplitContainers_NOT_USED()
+        void configureSplitContainers()
         {
             //    1   2  1      4    = 8
             //  +--+----+--+--------+
@@ -79,14 +82,14 @@ namespace JSONExtractor
             splitContainerJSONandButtonsVsDatagrids.SplitterDistance = w8 * 3;  // (BC, D)
             splitContainerTreeVsOpts.SplitterDistance = w8 * 2;                 // (B, C)
 
-            splitContainerFilterVsAttrControls.SplitterDistance = splitContainerFilterVsAttrControls.Height / 2;
+            // splitContainerFilterVsAttrControls.SplitterDistance = splitContainerFilterVsAttrControls.Height / 2;
             splitContainerFilterVsAttributeTables.SplitterDistance = splitContainerFilterVsAttributeTables.Height / 2;
 
             foreach (var splitter in new SplitContainer[] {
                     splitContainerTabsVsJSONOnward,
                     splitContainerJSONandButtonsVsDatagrids,
                     splitContainerTreeVsOpts,
-                    splitContainerFilterVsAttrControls,
+                    // splitContainerFilterVsAttrControls,
                     splitContainerFilterVsAttributeTables })
             {
                 splitter.IsSplitterFixed = false;
@@ -313,6 +316,7 @@ namespace JSONExtractor
             {
                 ea.interpolate = true;
                 ea.interpolationCoeffsFullPath = interpolationCoefficientsJSONPath;
+                ea.interpolationExcitationFullPath = interpolationExcitationJSONPath;
                 ea.interpolationStart = (int)numericUpDownInterpolationStart.Value;
                 ea.interpolationEnd   = (int)numericUpDownInterpolationEnd.Value;
                 ea.interpolationIncr  = (float)numericUpDownInterpolationIncr.Value;
@@ -329,8 +333,6 @@ namespace JSONExtractor
         /// in interpolating other aggregate data (e.g. spectra) against the
         /// generated x-axis.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void buttonUseCoefficients_Click(object sender, EventArgs e)
         {
             var ea = generateExtractAttributeFromSelectedJSONNode();
@@ -341,6 +343,26 @@ namespace JSONExtractor
             }
 
             interpolationCoefficientsJSONPath = ea.jsonFullPath;
+            logger.info($"will use {ea.jsonFullPath} as interpolation coefficients");
+            toolTip1.SetToolTip(buttonUseCoefficients, ea.jsonFullPath);
+
+            // to simplify things, let's just lock that down after one click, shall we
+            buttonUseCoefficients.Enabled = false;
+
+            // now that we've chosen a wavecal, let's move on to excitation
+            buttonExcitation.Enabled = true;
+        }
+
+        private void buttonExcitation_Click(object sender, EventArgs e)
+        {
+            var ea = generateExtractAttributeFromSelectedJSONNode();
+
+            interpolationExcitationJSONPath = ea.jsonFullPath;
+            logger.info($"will use {ea.jsonFullPath} as interpolation excitation");
+            toolTip1.SetToolTip(buttonExcitation, ea.jsonFullPath);
+
+            // to simplify things, let's just lock that down after one click, shall we
+            buttonExcitation.Enabled = false;
         }
 
         ExtractAttribute generateExtractAttributeFromSelectedJSONNode()
@@ -401,6 +423,8 @@ namespace JSONExtractor
             extractAttributes.Insert(row + 1, ea);
             // dataGridViewAttributes.Rows[row + 1].Selected = true;
         }
+
+        private void checkBoxInterpolate_CheckedChanged(object sender, EventArgs e) => groupBoxInterpolation.Visible = checkBoxInterpolate.Checked;
 
         ////////////////////////////////////////////////////////////////////////
         // Select Input Files
@@ -479,6 +503,11 @@ namespace JSONExtractor
             dedupeInputPathnames();
         }
 
+        /// <summary>
+        /// This performs BOTH de-duping of "unique" filename tokens (like serial
+        /// number), to ensure that only the last record of a given token is 
+        /// processed, AND checking the "Within" clause using the same token.
+        /// </summary>
         void dedupeInputPathnames()
         {
             selectedPathnames.Sort();
@@ -486,6 +515,34 @@ namespace JSONExtractor
 
             if (checkBoxDedupeFilenames.Checked)
             {
+                ////////////////////////////////////////////////////////////////
+                // parse Within list (on comma if found, else whitespace)
+                ////////////////////////////////////////////////////////////////
+
+                HashSet<string> withinSet = new();
+                string withinStr = textBoxDedupeWithin.Text.Trim().ToLower();
+                if (withinStr.Length > 0)
+                {
+                    List<string> tok = new();
+                    if (withinStr.Contains(','))
+                    {
+                        foreach (var s in withinStr.Split(","))
+                            if (s.Trim().Length > 0)
+                                withinSet.Add(s.Trim());
+                    }
+                    else
+                    {
+                        foreach (var s in withinStr.Split())
+                            if (s.Trim().Length > 0)
+                                withinSet.Add(s.Trim());
+                    }
+                    logger.debug($"applying withinSet: {string.Join(", ", withinSet)}");
+                }
+
+                ////////////////////////////////////////////////////////////////
+                // Dedupe on unique token
+                ////////////////////////////////////////////////////////////////
+
                 var re = new Regex(textBoxDedupeFilenames.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
                 Dictionary<string, string> latestUnique = new Dictionary<string, string>();
                 foreach (var pathname in selectedPathnames)
@@ -495,12 +552,25 @@ namespace JSONExtractor
                     if (match.Success && match.Groups.Count > 1)
                     {
                         var unique = match.Groups[1].Value;
+
+                        // if we defined a Within list, then first ensure this is
+                        // a valid element
+                        if (withinSet.Count > 0)
+                            if (!withinSet.Contains(unique.ToLower()))
+                                continue;
+                        
                         latestUnique[unique] = pathname;
                     }
                     else
                     {
-                        // we didn't match the pattern, so just store the pathname directly
-                        latestUnique[basename] = pathname;
+                        if (withinSet.Count == 0)
+                        {
+                            // we didn't match the pattern, so just store the
+                            // pathname directly (do this if we're "just"
+                            // dedupping...if a "Within" list was specified, this
+                            // is a fail)
+                            latestUnique[basename] = pathname;
+                        }
                     }
                 }
                 dedupedPathnames = new();
@@ -817,11 +887,5 @@ namespace JSONExtractor
                 logger.debug($"Attribute rows selected: {rows}");
             }
         }
-
-        private void checkBoxInterpolate_CheckedChanged(object sender, EventArgs e)
-        {
-
-        }
-
     }
 }

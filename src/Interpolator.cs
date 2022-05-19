@@ -14,6 +14,9 @@ namespace JSONExtractor
         int pixels = 0;
         int pos = 0; // where the interpolation state currently sits in xaxis (lower bound)
 
+        Logger logger = Logger.getInstance();
+        static int count = 0;
+
         // assumes x are sorted, and y in same order
         public Interpolator(List<double> x, List<double> y)
         {
@@ -70,11 +73,17 @@ namespace JSONExtractor
             double x1 = x[pos + 1];
         
             // lookup associated bracketing y values
-            double a0 = data[x0];
-            double a1 = data[x1];
+            double y0 = data[x0];
+            double y1 = data[x1];
         
             // perform linear interpolation between those two points
-            return (((newX - x0) / (x1 - x0)) * (a1 - a0)) + a0;
+            double newY = (((newX - x0) / (x1 - x0)) * (y1 - y0)) + y0;
+
+            if (count % 100 == 0)
+                logger.debug($"interpolator: interpolated old x0 {x0:f2}, x1 {x1:f2} and y0 {y0:f2}, y1 {y1:f2} to new x {newX:f2}, y {newY:f2}");
+            count++;
+
+            return newY;
         }
     }
 }

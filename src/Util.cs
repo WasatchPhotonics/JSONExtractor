@@ -68,9 +68,9 @@ namespace JSONExtractor
             }
             catch (Exception ex)
             {
-                logger.error($"exception finding {tok} in node: {ex}");
+                logger.error($"exception finding {jsonPath} in node: {ex}");
             }
-            logger.error($"can't find {tok} in node");
+            logger.error($"getJsonValue: can't find {jsonPath} in node");
             return result;
         }
 
@@ -105,5 +105,26 @@ namespace JSONExtractor
                 return $"{mins}min {secs}sec remaining";
             }
         }
+
+        // surely there's an easier way to do this
+        public static double toDouble(object o)
+        {
+            if (o is Double) return (Double)o;
+            if (o is Single) return (Single)o;
+            if (o is Int64) return (Int64)o;
+            if (o is Int32) return (Int32)o;
+            if (o is Int16) return (Int16)o;
+            return Double.NaN;
+        }
+
+        /// <summary>
+        /// I really hoped I'd be able to keep spectroscopy specifics out of 
+        /// this "generic" JSON utility...oh well.
+        /// </summary>
+        public static double wavelengthToWavenumber(double wavelength, double laserWavelengthNM)
+        {
+            const double NM_TO_CM = 1.0 / 10000000.0;
+            return 1.0 / (laserWavelengthNM * NM_TO_CM) - (1.0 / (wavelength * NM_TO_CM));
+        }   
     }
 }

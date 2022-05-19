@@ -41,6 +41,7 @@ namespace JSONExtractor
         int tableDimension = 0; // not all arrays (spectra, wavecal etc) may be of the same length
 
         public string interpolationCoeffsFullPath; // jsonFullPath to the coefficients array used for interpolation
+        public string interpolationExcitationFullPath; // jsonFullPath to the excitation attribute used for interpolation
         public int interpolationStart;
         public int interpolationEnd;
         public float interpolationIncr;
@@ -142,7 +143,7 @@ namespace JSONExtractor
         /// We need to perform interpolation here, since each record may have its
         /// own calibration coefficients.
         /// </remarks>
-        public void storeTable(object obj, string key, IDictionary<string, object> jsonObj = null)
+        public void storeTable(object obj, string key, IDictionary<string, object> jsonRoot = null)
         {
             if (obj is null)
                 return;
@@ -153,8 +154,11 @@ namespace JSONExtractor
 
             List<double> values = l.OfType<double>().ToList();
 
-            if (interpolate && jsonObj != null)
-                values = interpolateValues(values, jsonObj);
+            if (interpolate && jsonRoot != null)
+            {
+                logger.debug("storeValues: interpolating values");
+                values = interpolateValues(values, jsonRoot);
+            }
 
             tableData.Add(values);
             tableKeys.Add(key);
@@ -213,21 +217,26 @@ namespace JSONExtractor
 
         List<double> getCoefficients(IDictionary<string, object> jsonObj)
         {
+            logger.debug($"getCoefficients: getting {interpolationCoeffsFullPath}"); 
             var value = Util.getJsonValue(jsonObj, interpolationCoeffsFullPath);
             if (value is null)
                 return null;
 
-            var l = (List<object>)jsonObj;
+            var l = (List<object>)value;
             List<double> values = l.OfType<double>().ToList();
             if (values.Count == 0)
                 return null;
 
+            logger.debug($"getCoefficients: got {values}"); 
             return values;
         }
 
+        /// <remarks>
+        /// compromise between length, performance and reusability 
+        /// (most calibrations are 2nd-to-4th order)
+        /// </remarks>
         double evaluatePolynomial(double x, List<double> coeffs)
         {
-            // compromise between length, performance and reusability
             double result = 0;
             if (coeffs.Count >= 1) result  = coeffs[0];
             if (coeffs.Count >= 2) result += coeffs[1] * x;
@@ -242,23 +251,51 @@ namespace JSONExtractor
         /// <summary>
         /// Interpolate this 1D array to the specified arithmetic x-axis.
         /// </summary>
-        List<double> interpolateValues(List<double> a, IDictionary<string, object> jsonObj)
+        List<double> interpolateValues(List<double> oldY, IDictionary<string, object> jsonObj)
         {
+            ////////////////////////////////////////////////////////////////////
+            // generate original x-axis
+            ////////////////////////////////////////////////////////////////////
+
             List<double> coeffs = getCoefficients(jsonObj);
-            List<double> oldX = new List<double>(a.Count);
-            for (int i = 0; i < a.Count; i++)
+            logger.debug($"interpolateValues: using coeff[0] {coeffs[0]} (cnt {coeffs.Count})");
+
+            List<double> oldX = new List<double>(oldY.Count);
+            for (int i = 0; i < oldY.Count; i++)
                 oldX.Add(evaluatePolynomial(i, coeffs));
-            Interpolator interp = new Interpolator(oldX, a);
+
+            var excitationObj = Util.getJsonValue(jsonObj, interpolationExcitationFullPath);
+            if (excitationObj != null)
+            {
+                var excitationNM = Util.toDouble(excitationObj);
+                for (int i = 0; i < oldX.Count; i++)
+                    oldX[i] = Util.wavelengthToWavenumber(oldX[i], excitationNM);
+            }
+
+            logger.debug("interpolateValues: generated oldX from {0:f2}, {1:f2}..{2:f2}, {3:f2}",
+                oldX[0], oldX[1], oldX[coeffs.Count-2], oldX[coeffs.Count-1]);
+
+            ////////////////////////////////////////////////////////////////////
+            // interpolate to new x-axis
+            ////////////////////////////////////////////////////////////////////
+
+            logger.debug("interpolateValues: instantiating Interpolator");
+            Interpolator interp = new Interpolator(x: oldX, y: oldY);
+
+            logger.debug("interpolateValues: interpolating to newX");
             int step = 0;
             List<double> newY = new();
             double x = interpolationStart;
             while (x <= interpolationEnd)
             {
-                newY.Add(interp.interpolate(interpolationStart + step * interpolationIncr));
+                x = interpolationStart + step * interpolationIncr;
+                var y = interp.interpolate(x);
+                newY.Add(y);
+                if (step % 100 == 0)
+                    logger.debug($"interpolated newX {x:f2} to {y:f2}");
                 step++;
             }
             return newY;
         }
-
     }
 }
