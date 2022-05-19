@@ -1,14 +1,17 @@
 # Changelog
 
+- 2022-05-18 1.2.1
+    - added SpectraUtil
+    - refactored interpolation
 - 2022-05-18
     - added interpolation
-- 2022-05-17
+- 2022-05-17 1.2.0
     - added filename filtering
     - added de-duping
-- 2022-05-16
+- 2022-05-16 1.1.0
     - added double-click
     - basic extracts work
-- 2022-05-14 
+- 2022-05-14 1.0.0
     - add support for .json.gz
     - implemented removing extract and filter attributes
     - added filter negation

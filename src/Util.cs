@@ -116,15 +116,5 @@ namespace JSONExtractor
             if (o is Int16) return (Int16)o;
             return Double.NaN;
         }
-
-        /// <summary>
-        /// I really hoped I'd be able to keep spectroscopy specifics out of 
-        /// this "generic" JSON utility...oh well.
-        /// </summary>
-        public static double wavelengthToWavenumber(double wavelength, double laserWavelengthNM)
-        {
-            const double NM_TO_CM = 1.0 / 10000000.0;
-            return 1.0 / (laserWavelengthNM * NM_TO_CM) - (1.0 / (wavelength * NM_TO_CM));
-        }   
     }
 }

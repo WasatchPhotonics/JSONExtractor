@@ -126,6 +126,7 @@ namespace JSONExtractor
             this.folderBrowserDialogInputDir = new System.Windows.Forms.FolderBrowserDialog();
             this.backgroundWorkerExtraction = new System.ComponentModel.BackgroundWorker();
             this.saveFileDialogExtract = new System.Windows.Forms.SaveFileDialog();
+            this.tabPageInterpolation = new System.Windows.Forms.TabPage();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerTopVsBottom)).BeginInit();
             this.splitContainerTopVsBottom.Panel1.SuspendLayout();
             this.splitContainerTopVsBottom.Panel2.SuspendLayout();
@@ -179,6 +180,7 @@ namespace JSONExtractor
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewAttributes)).BeginInit();
             this.tableLayoutPanelProgressAndLog.SuspendLayout();
             this.groupBoxEventLog.SuspendLayout();
+            this.tabPageInterpolation.SuspendLayout();
             this.SuspendLayout();
             // 
             // splitContainerTopVsBottom
@@ -227,6 +229,7 @@ namespace JSONExtractor
             this.tabControl1.Alignment = System.Windows.Forms.TabAlignment.Left;
             this.tabControl1.Controls.Add(this.tabPageInput);
             this.tabControl1.Controls.Add(this.tabPageExtract);
+            this.tabControl1.Controls.Add(this.tabPageInterpolation);
             this.tabControl1.Controls.Add(this.tabPageConfig);
             this.tabControl1.Controls.Add(this.tabPageAWS);
             this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -773,7 +776,6 @@ namespace JSONExtractor
             this.flowLayoutPanel1.AutoScroll = true;
             this.flowLayoutPanel1.Controls.Add(this.groupBox4);
             this.flowLayoutPanel1.Controls.Add(this.groupBox7);
-            this.flowLayoutPanel1.Controls.Add(this.groupBoxInterpolation);
             this.flowLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.flowLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.flowLayoutPanel1.Name = "flowLayoutPanel1";
@@ -1128,6 +1130,7 @@ namespace JSONExtractor
             // checkBoxInterpolate
             // 
             this.checkBoxInterpolate.AutoSize = true;
+            this.checkBoxInterpolate.Enabled = false;
             this.checkBoxInterpolate.Location = new System.Drawing.Point(140, 338);
             this.checkBoxInterpolate.Margin = new System.Windows.Forms.Padding(5);
             this.checkBoxInterpolate.Name = "checkBoxInterpolate";
@@ -1135,20 +1138,19 @@ namespace JSONExtractor
             this.checkBoxInterpolate.TabIndex = 13;
             this.checkBoxInterpolate.Text = "Interpolate";
             this.checkBoxInterpolate.UseVisualStyleBackColor = true;
-            this.checkBoxInterpolate.CheckedChanged += new System.EventHandler(this.checkBoxInterpolate_CheckedChanged);
             // 
             // groupBoxInterpolation
             // 
             this.groupBoxInterpolation.Controls.Add(this.tableLayoutPanel7);
-            this.groupBoxInterpolation.Location = new System.Drawing.Point(5, 808);
+            this.groupBoxInterpolation.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.groupBoxInterpolation.Location = new System.Drawing.Point(3, 3);
             this.groupBoxInterpolation.Margin = new System.Windows.Forms.Padding(5);
             this.groupBoxInterpolation.Name = "groupBoxInterpolation";
             this.groupBoxInterpolation.Padding = new System.Windows.Forms.Padding(5);
-            this.groupBoxInterpolation.Size = new System.Drawing.Size(291, 306);
+            this.groupBoxInterpolation.Size = new System.Drawing.Size(306, 963);
             this.groupBoxInterpolation.TabIndex = 1;
             this.groupBoxInterpolation.TabStop = false;
             this.groupBoxInterpolation.Text = "Interpolation";
-            this.groupBoxInterpolation.Visible = false;
             // 
             // tableLayoutPanel7
             // 
@@ -1161,8 +1163,8 @@ namespace JSONExtractor
             this.tableLayoutPanel7.Controls.Add(this.label10, 0, 0);
             this.tableLayoutPanel7.Controls.Add(this.label12, 0, 1);
             this.tableLayoutPanel7.Controls.Add(this.label13, 0, 2);
-            this.tableLayoutPanel7.Controls.Add(this.buttonUseCoefficients, 1, 3);
-            this.tableLayoutPanel7.Controls.Add(this.buttonExcitation, 1, 4);
+            this.tableLayoutPanel7.Controls.Add(this.buttonUseCoefficients, 0, 3);
+            this.tableLayoutPanel7.Controls.Add(this.buttonExcitation, 0, 4);
             this.tableLayoutPanel7.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel7.Location = new System.Drawing.Point(5, 37);
             this.tableLayoutPanel7.Margin = new System.Windows.Forms.Padding(5);
@@ -1173,7 +1175,8 @@ namespace JSONExtractor
             this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel7.Size = new System.Drawing.Size(281, 264);
+            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel7.Size = new System.Drawing.Size(296, 921);
             this.tableLayoutPanel7.TabIndex = 0;
             // 
             // numericUpDownInterpolationStart
@@ -1264,23 +1267,24 @@ namespace JSONExtractor
             // 
             // buttonUseCoefficients
             // 
-            this.buttonUseCoefficients.Location = new System.Drawing.Point(77, 152);
+            this.tableLayoutPanel7.SetColumnSpan(this.buttonUseCoefficients, 2);
+            this.buttonUseCoefficients.Location = new System.Drawing.Point(5, 152);
             this.buttonUseCoefficients.Margin = new System.Windows.Forms.Padding(5);
             this.buttonUseCoefficients.Name = "buttonUseCoefficients";
-            this.buttonUseCoefficients.Size = new System.Drawing.Size(150, 40);
+            this.buttonUseCoefficients.Size = new System.Drawing.Size(200, 40);
             this.buttonUseCoefficients.TabIndex = 20;
-            this.buttonUseCoefficients.Text = "Wavecal";
+            this.buttonUseCoefficients.Text = "Set Wavecal";
             this.buttonUseCoefficients.UseVisualStyleBackColor = true;
             this.buttonUseCoefficients.Click += new System.EventHandler(this.buttonUseCoefficients_Click);
             // 
             // buttonExcitation
             // 
-            this.buttonExcitation.Enabled = false;
-            this.buttonExcitation.Location = new System.Drawing.Point(75, 200);
+            this.tableLayoutPanel7.SetColumnSpan(this.buttonExcitation, 2);
+            this.buttonExcitation.Location = new System.Drawing.Point(3, 200);
             this.buttonExcitation.Name = "buttonExcitation";
-            this.buttonExcitation.Size = new System.Drawing.Size(150, 40);
+            this.buttonExcitation.Size = new System.Drawing.Size(200, 40);
             this.buttonExcitation.TabIndex = 21;
-            this.buttonExcitation.Text = "Excitation";
+            this.buttonExcitation.Text = "Set Excitation";
             this.toolTip1.SetToolTip(this.buttonExcitation, "If specified, interpolated axis will be in wavenumber rather than wavelength spac" +
         "e");
             this.buttonExcitation.UseVisualStyleBackColor = true;
@@ -1448,6 +1452,17 @@ namespace JSONExtractor
             this.saveFileDialogExtract.Filter = "CSV Files (*.csv)|*.csv";
             this.saveFileDialogExtract.Title = "Run Extract";
             // 
+            // tabPageInterpolation
+            // 
+            this.tabPageInterpolation.Controls.Add(this.groupBoxInterpolation);
+            this.tabPageInterpolation.Location = new System.Drawing.Point(43, 4);
+            this.tabPageInterpolation.Name = "tabPageInterpolation";
+            this.tabPageInterpolation.Padding = new System.Windows.Forms.Padding(3);
+            this.tabPageInterpolation.Size = new System.Drawing.Size(312, 969);
+            this.tabPageInterpolation.TabIndex = 5;
+            this.tabPageInterpolation.Text = "Interpolation";
+            this.tabPageInterpolation.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(13F, 32F);
@@ -1523,6 +1538,7 @@ namespace JSONExtractor
             this.tableLayoutPanelProgressAndLog.ResumeLayout(false);
             this.groupBoxEventLog.ResumeLayout(false);
             this.groupBoxEventLog.PerformLayout();
+            this.tabPageInterpolation.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -1625,6 +1641,7 @@ namespace JSONExtractor
         private System.Windows.Forms.Button buttonUseCoefficients;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
         private System.Windows.Forms.Button buttonExcitation;
+        private System.Windows.Forms.TabPage tabPageInterpolation;
     }
 }
 

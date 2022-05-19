@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using Newtonsoft.Json;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Drawing;
 
 namespace JSONExtractor
 {
@@ -64,6 +65,8 @@ namespace JSONExtractor
             clearFileCounts();
 
             initFromSettings();
+
+            updateInterpolationControls();
 
             backgroundWorkerExtraction.DoWork += BackgroundWorkerExtraction_DoWork;
             backgroundWorkerExtraction.ProgressChanged += BackgroundWorkerExtraction_ProgressChanged;
@@ -175,12 +178,19 @@ namespace JSONExtractor
                 if (value is IDictionary<string, object> dict)
                 {
                     if (dict.Count > 0)
-                        populateTreeView(dict, treeNode.Nodes.Add(key));
+                    {
+                        var tvn = treeNode.Nodes.Add(key);
+                        tvn.ForeColor = SystemColors.GrayText;
+                        populateTreeView(dict, tvn);
+                    }
                     else
                         logger.debug($"ignoring empty JSON dict {key}");
                 }
                 else if (value is List<object>)
-                    treeNode.Nodes.Add(key + "[]");
+                {
+                    var tvn = treeNode.Nodes.Add(key + "[]");
+                    tvn.ForeColor = SystemColors.HotTrack;
+                }
                 else
                     treeNode.Nodes.Add(key);
             }
@@ -234,6 +244,8 @@ namespace JSONExtractor
                 label = label.Substring(0, label.Length - 2);
             textBoxExtractAttributeLabel.Text = label;
             textBoxExtractAttributeDefault.Text = "";
+
+            updateInterpolationControls();
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -314,14 +326,20 @@ namespace JSONExtractor
             // if interpolation is enabled, store the path to the coeffs we're to use for interpolating THIS ExtractAttribute
             if (checkBoxInterpolate.Checked)
             {
-                ea.interpolate = true;
-                ea.interpolationCoeffsFullPath = interpolationCoefficientsJSONPath;
-                ea.interpolationExcitationFullPath = interpolationExcitationJSONPath;
-                ea.interpolationStart = (int)numericUpDownInterpolationStart.Value;
-                ea.interpolationEnd   = (int)numericUpDownInterpolationEnd.Value;
-                ea.interpolationIncr  = (float)numericUpDownInterpolationIncr.Value;
+                // the new interpolated axis can be created immediately
+                logger.debug("instantiating Interpolator.Axis");
+                ea.interpolatedAxis = new Interpolator.Axis(
+                    (int)numericUpDownInterpolationStart.Value,
+                    (int)numericUpDownInterpolationEnd.Value,
+                    (float)numericUpDownInterpolationIncr.Value
+                );
+
+                // the old wavelength/wavenumber axis will have to be generated per-record
+                logger.debug("instantiating WavecalGenerator");
+                ea.wavecalGenerator = new SpectrumUtil.WavecalGenerator(interpolationCoefficientsJSONPath, interpolationExcitationJSONPath);
             }
 
+            logger.debug($"adding {ea}");
             extractAttributes.Add(ea);
             extractBindingSource.ResetBindings(false);
             updateStartability();
@@ -335,34 +353,100 @@ namespace JSONExtractor
         /// </summary>
         private void buttonUseCoefficients_Click(object sender, EventArgs e)
         {
-            var ea = generateExtractAttributeFromSelectedJSONNode();
-            if (ea.aggregateType is null)
+            if (interpolationCoefficientsJSONPath is null)
             {
-                logger.error("Coefficients must be an array type");
-                return;
+                var ea = generateExtractAttributeFromSelectedJSONNode();
+                if (ea.aggregateType is null)
+                {
+                    logger.error("Coefficients must be an array type");
+                    return;
+                }
+
+                interpolationCoefficientsJSONPath = ea.jsonFullPath;
+                logger.info($"taking wavecal from {ea.jsonFullPath}");
+            }
+            else
+            {
+                interpolationCoefficientsJSONPath = null;
+                buttonUseCoefficients.Text = "Set Wavecal";
+            }
+            updateInterpolationControls();
+        }
+
+        /// <todo>
+        /// - update ToolTip to show on disabled controls
+        /// </todo>
+        void updateInterpolationControls()
+        {
+            // checkBoxInterpolate
+            if (interpolationCoefficientsJSONPath != null)
+            {
+                checkBoxInterpolate.Enabled = true;
+                toolTip1.SetToolTip(checkBoxInterpolate, "Interpolation is available because a wavecal was selected");
+            }
+            else
+            {
+                checkBoxInterpolate.Checked = 
+                    checkBoxInterpolate.Enabled = false;
+                toolTip1.SetToolTip(checkBoxInterpolate, "Interpolation requires a wavecal");
             }
 
-            interpolationCoefficientsJSONPath = ea.jsonFullPath;
-            logger.info($"will use {ea.jsonFullPath} as interpolation coefficients");
-            toolTip1.SetToolTip(buttonUseCoefficients, ea.jsonFullPath);
+            // buttonUseCoefficients
+            if (interpolationCoefficientsJSONPath == null)
+            {
+                buttonUseCoefficients.Text = "Set Wavecal";
+                buttonExcitation.Enabled = false;
 
-            // to simplify things, let's just lock that down after one click, shall we
-            buttonUseCoefficients.Enabled = false;
+                if (isArrayNodeSelected())
+                {
+                    buttonUseCoefficients.Enabled = true;
+                    toolTip1.SetToolTip(buttonUseCoefficients, "Select a JSON element providing wavecal coefficients to enable interpolation (wavelength or wavenumber depending whether excitation is also provided)");
+                }
+                else
+                {
+                    buttonUseCoefficients.Enabled = false;
+                    toolTip1.SetToolTip(buttonUseCoefficients, "Wavecal requires an array element");
+                }
+            }
+            else
+            {
+                buttonUseCoefficients.Text = "Clear Wavecal";
+                toolTip1.SetToolTip(buttonUseCoefficients, "Clearing wavecal will disable interpolation");
+                buttonExcitation.Enabled = true;
+            }
 
-            // now that we've chosen a wavecal, let's move on to excitation
-            buttonExcitation.Enabled = true;
+            // buttonExcitation
+            if (interpolationExcitationJSONPath is null)
+            {
+                toolTip1.SetToolTip(buttonExcitation, "Select a JSON element providing laser excitation to interpolate data against a wavenumber axis");
+                buttonExcitation.Text = "Set Excitation";
+            }
+            else
+            {
+                buttonExcitation.Text = "Clear Excitation";
+                toolTip1.SetToolTip(buttonExcitation, "Clearing excitation will cause interpolated x-axis to use wavelength space");
+            }
         }
 
         private void buttonExcitation_Click(object sender, EventArgs e)
         {
-            var ea = generateExtractAttributeFromSelectedJSONNode();
+            if (interpolationExcitationJSONPath is null)
+            {
+                var ea = generateExtractAttributeFromSelectedJSONNode();
+                interpolationExcitationJSONPath = ea.jsonFullPath;
+                logger.info($"taking excitation wavelength from {ea.jsonFullPath}");
+            }
+            else
+            {
+                interpolationExcitationJSONPath = null;
+            }
+            updateInterpolationControls();
+        }
 
-            interpolationExcitationJSONPath = ea.jsonFullPath;
-            logger.info($"will use {ea.jsonFullPath} as interpolation excitation");
-            toolTip1.SetToolTip(buttonExcitation, ea.jsonFullPath);
-
-            // to simplify things, let's just lock that down after one click, shall we
-            buttonExcitation.Enabled = false;
+        bool isArrayNodeSelected()
+        {
+            var tvn = treeViewJSON.SelectedNode; 
+            return (tvn != null && tvn.Text.EndsWith("[]"));
         }
 
         ExtractAttribute generateExtractAttributeFromSelectedJSONNode()
@@ -423,8 +507,6 @@ namespace JSONExtractor
             extractAttributes.Insert(row + 1, ea);
             // dataGridViewAttributes.Rows[row + 1].Selected = true;
         }
-
-        private void checkBoxInterpolate_CheckedChanged(object sender, EventArgs e) => groupBoxInterpolation.Visible = checkBoxInterpolate.Checked;
 
         ////////////////////////////////////////////////////////////////////////
         // Select Input Files
@@ -711,12 +793,13 @@ namespace JSONExtractor
                     string full = ea.jsonFullPath;
                     if (full.StartsWith("root\\"))
                         full = full.Substring(5);
-                    headersLong.Add(full);
+
+                    headersLong.Add(full == ea.label ? "" : full);
                     headersShort.Add(ea.label);
                 }
             }
-            outfile.WriteLine(string.Join(',', headersLong));
-            outfile.WriteLine(string.Join(',', headersShort));
+            outfile.WriteLine("," + string.Join(',', headersLong));
+            outfile.WriteLine("," + string.Join(',', headersShort));
 
             processedCount = 0;
 
@@ -784,7 +867,9 @@ namespace JSONExtractor
 
                 logger.debug($"loading {pathname}");
 
-                var key = pathname.Split("\\").Last().Split(".").First();
+                // Given "C:\Users\mzieg\Documents\foo.json.gz", extracts "foo".
+                // We need this for labeling records in tables.
+                var recordKey = pathname.Split("\\").Last().Split(".").First();
 
                 var jsonText = Util.loadText(pathname);
                 var jsonObj = JsonConvert.DeserializeObject<IDictionary<string, object>>(jsonText, new DictionaryConverter());
@@ -816,6 +901,10 @@ namespace JSONExtractor
 
                 // filters passed, so extract new record
                 List<string> values = new List<string>();
+
+                // just do this automatically
+                values.Add(recordKey);  
+
                 bool hasData = false;
                 foreach (var ea in extractAttributes)
                 {
@@ -826,7 +915,7 @@ namespace JSONExtractor
                     // pass jsonObj so the ExtractAttribute can find its
                     // coefficients if interpolation is called for
                     if (ea.isTable())
-                        ea.storeTable(value, key, jsonObj);
+                        ea.storeTable(value, recordKey, jsonObj);
                     else
                         values.Add(ea.formatValue(value));
                 }
@@ -854,7 +943,7 @@ namespace JSONExtractor
                 if (ea.isTable())
                 {
                     outfile.WriteLine();
-                    outfile.WriteLine($"[{ea.label}]");
+                    outfile.WriteLine($"[{ea.jsonFullPath}]");
                     outfile.WriteLine(ea.formatTable());
                 }
             }

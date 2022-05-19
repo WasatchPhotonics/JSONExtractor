@@ -7,7 +7,7 @@ namespace JSONExtractor
     class Interpolator
     {
         SortedDictionary<double, double> data;
-        readonly List<double> x;
+        readonly List<double> oldX;
         readonly double firstX;
         readonly double lastX;
 
@@ -15,34 +15,59 @@ namespace JSONExtractor
         int pos = 0; // where the interpolation state currently sits in xaxis (lower bound)
 
         Logger logger = Logger.getInstance();
-        static int count = 0;
 
-        // assumes x are sorted, and y in same order
-        public Interpolator(List<double> x, List<double> y)
+        /// <summary>
+        /// Construct a new Interpolator.
+        /// </summary>
+        /// <param name="oldX">the original x-axis (e.g. wavelengths or wavenumbers)</param>
+        /// <param name="oldY">the original y-axis (e.g. spectrum intensity)</param>
+        /// <remarks>
+        /// assumes x is sorted, and y is in the same order
+        /// </remarks>
+        public Interpolator(List<double> oldX, List<double> oldY)
         {
-            if (x == null) throw new Exception("x null");
-            if (y == null) throw new Exception("y null");
-            if (x.Count < 1) throw new Exception("x empty");
-            if (y.Count < 1) throw new Exception("y empty");
-            if (x.Count != y.Count) throw new Exception($"x.dim != y.dim ({x.Count} != {y.Count})");
+            if (oldX == null) throw new Exception("oldX null");
+            if (oldY == null) throw new Exception("oldY null");
+            if (oldX.Count < 1) throw new Exception("oldX empty");
+            if (oldY.Count < 1) throw new Exception("oldY empty");
+            if (oldX.Count != oldY.Count) throw new Exception($"oldX.dim {oldY.Count} != oldY.dim {oldY.Count}");
 
-            this.x = x;
-            pixels = x.Count;
+            this.oldX = oldX;
+            pixels = oldX.Count;
 
             if (pixels < 1)
                 throw new Exception("no pixels");
 
-            firstX = x.First();
-            lastX = x.Last();
+            firstX = oldX.First();
+            lastX = oldX.Last();
 
+            // trade space for time and store as a lookup for speed
             data = new SortedDictionary<double, double>();
             for (int i = 0; i < pixels; i++)
-                data.Add(x[i], y[i]);
+                data.Add(oldX[i], oldY[i]);
         }
 
-        // NOTE: this method will execute much more efficiently if called with 
-        // sequentially increasing x values (though it should still work
-        // if used as "random access" into the data, just more slowly)
+        /// <summary>
+        /// Interpolate the dataset to the provided new x-axis.
+        /// </summary>
+        /// <param name="newX">the new x-axis to which we should interpolate the stored y values</param>
+        /// <returns></returns>
+        public List<double> interpolate(List<double> newX)
+        {
+            List<double> newY = new();
+            foreach (var x in newX)
+                newY.Add(interpolate(x));
+            return newY;
+        }
+
+        /// <summary>
+        /// Interpolate a single value to the specified x coordinate.
+        /// </summary>
+        /// <remarks>
+        /// For efficiency call this method with sequentially increasing x
+        /// values. It should still work if used as "random access" into the
+        /// data, just more slowly
+        /// </remarks>
         public double interpolate(double newX)
         {
             // handle corner-cases fast (leave 'pos' where it is) - no misleadingly cute extrapolation, 
@@ -53,14 +78,14 @@ namespace JSONExtractor
 
             // this shouldn't happen if caller follows the "sequential" guidance (i.e.
             // each subsequent method call is invoked with an increasing x value)
-            if (x[pos] > newX)
+            if (oldX[pos] > newX)
                 pos = 0;
 
             // pos should now be an index SOMEWHERE BELOW the requested x;
             // advance until it is the index DIRECTLY BELOW the requested x 
             while (pos < pixels - 2)
             {
-                if (x[pos + 1] > newX)
+                if (oldX[pos + 1] > newX)
                     break;
                 pos++;
             }
@@ -69,21 +94,27 @@ namespace JSONExtractor
             // about running off the end...handled by initial corner-case)
 
             // lookup bracketing xaxis
-            double x0 = x[pos];
-            double x1 = x[pos + 1];
+            double x0 = oldX[pos];
+            double x1 = oldX[pos + 1];
         
             // lookup associated bracketing y values
             double y0 = data[x0];
             double y1 = data[x1];
         
-            // perform linear interpolation between those two points
-            double newY = (((newX - x0) / (x1 - x0)) * (y1 - y0)) + y0;
+            // perform linear interpolation between those two points (newY)
+            return (((newX - x0) / (x1 - x0)) * (y1 - y0)) + y0;
+        }
 
-            if (count % 100 == 0)
-                logger.debug($"interpolator: interpolated old x0 {x0:f2}, x1 {x1:f2} and y0 {y0:f2}, y1 {y1:f2} to new x {newX:f2}, y {newY:f2}");
-            count++;
+        public class Axis
+        {
+            public List<double> newX;
 
-            return newY;
+            public Axis(int start, int end, double incr)
+            {
+                newX = new();
+                for (double x = start, steps = 0; x < end; steps++)
+                    newX.Add(x = start + steps * incr);
+            }
         }
     }
 }
