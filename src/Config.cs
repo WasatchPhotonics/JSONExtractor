@@ -4,7 +4,7 @@ namespace JSONExtractor
 {
     internal class Config
     {
-        public List<ExtractAttribute.Serialized> extractAttributes { get; set; }
-        public List<FilterAttribute.Serialized> filterAttributes { get; set; }
+        public List<ExtractAttribute.Serialized> extractAttributes { get; set; } = new();
+        public List<FilterAttribute.Serialized> filterAttributes { get; set; } = new();
     }
 }

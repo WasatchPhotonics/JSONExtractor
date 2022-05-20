@@ -1,5 +1,8 @@
 # Changelog
 
+- 2022-05-20 1.2.3
+    - save/load config working
+    - added automatic inference of collatability (detect 3D data)
 - 2022-05-19 1.2.2
     - added TreeViewNode tooltips
     - added Config

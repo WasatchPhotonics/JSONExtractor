@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using System.IO;
 using System.IO.Compression;
 
@@ -75,19 +76,26 @@ namespace JSONExtractor
         }
 
         /// <see href="https://stackoverflow.com/a/897463/11615696"/>
-        public static double standardDeviation(IEnumerable<double> valueList)
+        public static double stdev(IEnumerable<double> values)
         {
             double M = 0.0;
             double S = 0.0;
             int k = 1;
-            foreach (double value in valueList)
+            foreach (var value in values)
             {
-                double tmpM = M;
+                var tmpM = M;
                 M += (value - tmpM) / k;
                 S += (value - tmpM) * (value - M);
                 k++;
             }
             return Math.Sqrt(S / (k - 2));
+        }
+
+        public static double median(IEnumerable<double> values)
+        {
+            List<double> s = new(values);
+            s.Sort();
+            return (s.Count % 2 == 1) ? s[s.Count / 2] : (s[s.Count / 2 - 1] + s[s.Count / 2]) / 2.0;
         }
 
         public static string timeRemainingLabel(double totalSec)
@@ -145,6 +153,11 @@ namespace JSONExtractor
                     tok.Add(l[i].ToString());
             }
             return "[" + string.Join(", ", tok) + "]";
+        }
+
+        public static string joinAny(IEnumerable<object> things, string delim = ", ")
+        {
+            return string.Join(delim, things.Select(thing => thing.ToString()).ToArray());
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -39,6 +40,9 @@ namespace JSONExtractor
         List<double> recentCompletionTimesSec = new List<double>();
         const int COMPLETION_TIMES_WINDOW = 100;
 
+        TreeNode pivotNode = null;
+        List<string> collationPath = null;
+
         Logger logger = Logger.getInstance();
 
         ////////////////////////////////////////////////////////////////////////
@@ -73,7 +77,9 @@ namespace JSONExtractor
             backgroundWorkerExtraction.RunWorkerCompleted += BackgroundWorkerExtraction_RunWorkerCompleted;
         }
 
-        // balance GUI (Visual Studio keeps resizing things?)
+        // Balance GUI (Visual Studio keeps resizing things?).
+        // Even with this, I still can't resize the splitContainers at runtime...
+        // no idea why :-(
         void configureSplitContainers()
         {
             //    1   2  1      4    = 8
@@ -81,18 +87,18 @@ namespace JSONExtractor
             //  |A |  B |C |    D   |
             //  +--+----+--+--------+
             var w8 = (int)(Width / 8);
-            splitContainerTabsVsJSONOnward.SplitterDistance = w8;               // (A, BCD)
+            splitContainerTabsVsJSONOnward.SplitterDistance = (int)(w8 * 1.1);  // (A, BCD)
+            splitContainerTabsVsJSONOnward.FixedPanel = FixedPanel.Panel1;
             splitContainerJSONandButtonsVsDatagrids.SplitterDistance = w8 * 3;  // (BC, D)
-            splitContainerTreeVsOpts.SplitterDistance = w8 * 2;                 // (B, C)
+            splitContainerTreeVsOpts.SplitterDistance = (int)(w8 * 1.8);        // (B, C)
+            splitContainerTreeVsOpts.FixedPanel = FixedPanel.Panel2;
 
-            // splitContainerFilterVsAttrControls.SplitterDistance = splitContainerFilterVsAttrControls.Height / 2;
             splitContainerFilterVsAttributeTables.SplitterDistance = splitContainerFilterVsAttributeTables.Height / 2;
 
             foreach (var splitter in new SplitContainer[] {
-                    splitContainerTabsVsJSONOnward,
+                    // splitContainerTabsVsJSONOnward,
                     splitContainerJSONandButtonsVsDatagrids,
-                    splitContainerTreeVsOpts,
-                    // splitContainerFilterVsAttrControls,
+                    // splitContainerTreeVsOpts,
                     splitContainerFilterVsAttributeTables })
             {
                 splitter.IsSplitterFixed = false;
@@ -123,7 +129,54 @@ namespace JSONExtractor
         void saveSettings() => Properties.Settings.Default.Save();
 
         ////////////////////////////////////////////////////////////////////////
-        // JSON Template
+        // Saved Configurations
+        ////////////////////////////////////////////////////////////////////////
+
+        private void buttonSaveConfig_Click(object sender, EventArgs e)
+        {
+            DialogResult ok = saveFileDialogConfig.ShowDialog();
+            if (ok != DialogResult.OK)
+                return;
+
+            Config config = new Config();
+            foreach (var ea in extractAttributes)
+                config.extractAttributes.Add(ExtractAttribute.Serialized.serialize(ea));
+            foreach (var fa in filterAttributes)
+                config.filterAttributes.Add(FilterAttribute.Serialized.serialize(fa));
+
+            using StreamWriter configFile = new(saveFileDialogConfig.FileName);
+                configFile.WriteLine(JsonConvert.SerializeObject(config, Formatting.Indented));
+
+            logger.info($"saved config to {saveFileDialogConfig.FileName}");
+        }
+
+        private void buttonLoadConfig_Click(object sender, EventArgs e)
+        {
+            DialogResult ok = openFileDialogConfig.ShowDialog();
+            if (ok != DialogResult.OK)
+                return;
+
+            string json = Util.loadText(openFileDialogConfig.FileName);
+            Config config = JsonConvert.DeserializeObject<Config>(json);
+
+            filterAttributes.Clear();
+            extractAttributes.Clear();
+
+            foreach (var fas in config.filterAttributes)
+                filterAttributes.Add(fas.deserialize());
+            foreach (var eas in config.extractAttributes)
+            {
+                var ea = eas.deserialize();
+                extractAttributes.Add(ea);
+            }
+
+            filterBindingSource.ResetBindings(false);
+            extractBindingSource.ResetBindings(false);
+            updateStartability();
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // Sample Template
         ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
@@ -169,8 +222,12 @@ namespace JSONExtractor
             rootNode.Expand();
         }
 
-        // Traverse down the loaded JSON object tree starting at jsonNode, populating
-        // the contents into the TreeView branch at treeNode.  
+        /// <summary>
+        /// Traverse down the loaded JSON object tree starting at jsonNode, populating
+        /// the contents into the TreeView branch at treeNode.  
+        /// </summary>
+        /// <param name="jsonNode">the current node in the loaded sample JSON template</param>
+        /// <param name="treeNode">the current node in the TreeView we're populating from the sample JSON template</param>
         void populateTreeView(IDictionary<string, object> jsonNode, TreeNode treeNode)
         {
             foreach (string key in jsonNode.Keys)
@@ -185,7 +242,9 @@ namespace JSONExtractor
                         populateTreeView(dict, tvn);
                     }
                     else
-                        logger.debug($"ignoring empty JSON dict {key}");
+                    {
+                        // logger.debug($"ignoring empty JSON dict {key}");
+                    }
                 }
                 else if (value is List<object>)
                 {
@@ -255,6 +314,8 @@ namespace JSONExtractor
             textBoxExtractAttributeDefault.Text = "";
 
             updateInterpolationControls();
+
+            updateCollationControls(tvn);
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -346,6 +407,13 @@ namespace JSONExtractor
                 // the old wavelength/wavenumber axis will have to be generated per-record
                 logger.debug("instantiating WavecalGenerator");
                 ea.wavecalGenerator = new SpectrumUtil.WavecalGenerator(interpolationCoefficientsJSONPath, interpolationExcitationJSONPath);
+            }
+
+            // if collation is enabled, store the path to the pivot node, and the relative path to THIS attribute
+            if (checkBoxCollate.Checked)
+            {
+                ea.collatePivotPath = pivotNode.FullPath;
+                ea.collationPath = collationPath;
             }
 
             logger.debug($"adding {ea}");
@@ -503,7 +571,6 @@ namespace JSONExtractor
             var ea = extractAttributes[row];
             extractAttributes.RemoveAt(row);
             extractAttributes.Insert(row - 1, ea);
-            // dataGridViewAttributes.Rows[row - 1].Selected = true;
         }
 
         private void buttonExtractAttributeDown_Click(object sender, EventArgs e)
@@ -514,7 +581,191 @@ namespace JSONExtractor
             var ea = extractAttributes[row];
             extractAttributes.RemoveAt(row);
             extractAttributes.Insert(row + 1, ea);
-            // dataGridViewAttributes.Rows[row + 1].Selected = true;
+        }
+
+        private void checkBoxCollate_CheckedChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        class Signature
+        {
+            public Type type;
+            public Type subtype;
+            public int count;
+            public string name;
+
+            public override string ToString() => $"<< type {type} name {name} (subtype {subtype}[cnt {count}]) >>";
+        }
+
+        void updateCollationControls(TreeNode tvn)
+        {
+            pivotNode = null;
+            collationPath = null;
+
+            // can the current attribute be collated?
+            bool collationPossible = false;
+
+            // for now, just support arrays
+            if (tvn.Text.EndsWith("[]"))
+            {
+                List<string> pathTok = tvn.FullPath.Split('\\').ToList();
+
+                // what are we pointing at? an array of 1024 doubles?
+                List<object> l = (List<object>)Util.getJsonValue(treeRoot, tvn.FullPath);
+
+                Signature sigNode = new() { type = l.GetType(), subtype = l[0].GetType(), count = l.Count, name = pathTok.Last() };
+                List<Signature> sigList = new() { sigNode };
+
+                var parent = tvn.Parent;
+                if (parent.Parent != null)
+                { 
+                    Tuple<TreeNode, List<string>> retval = findPivot(parent.Parent, sigList);
+                    if (retval != null)
+                    {
+                        collationPossible = true;
+                        pivotNode = retval.Item1;
+                        collationPath = retval.Item2;
+                    }
+                }
+            }
+
+            if (collationPossible)
+            {
+                logger.debug($"collation possible for {tvn.Text}");
+                checkBoxCollate.Enabled =
+                comboBoxCollateType.Enabled = true;
+                comboBoxCollateType.SelectedIndex = 0;
+            }
+            else
+            {
+                logger.debug($"collation not possible for {tvn.Text}");
+                checkBoxCollate.Enabled =
+                comboBoxCollateType.Enabled = false;
+                comboBoxCollateType.SelectedIndex = -1;
+            }
+        }
+
+        bool nodeContainsPath(TreeNode tvn, List<Signature> sigList)
+        {
+            if (tvn is null)
+                return false; 
+
+            Signature topSig = sigList.First();
+            var topName = topSig.name;
+
+            // does tvn "have a" topName?
+            logger.debug($"looking for {topName} in {tvn.Text}");
+
+            var children = tvn.Nodes;
+            for (int i = 0; i < children.Count; i++)
+            {
+                var child = tvn.Nodes[i];
+                if (child.Text != topSig.name)
+                    continue;
+
+                logger.debug($"found {child.Text} in {tvn.Text}");
+
+                // are there further nodes to descend into, or should we be at the leaf?
+                if (sigList.Count > 1)
+                {
+                    var newSigList = sigList.Take(1).ToList();
+                    logger.debug($"descending into {child.Text} to confirm newSigList " + Util.joinAny(newSigList));
+                    return nodeContainsPath(child, newSigList);
+                }
+                else
+                {
+                    logger.debug("we're at the leaf, so verify child is a List<subtype> with correct count (already matched name)");
+                    var value = Util.getJsonValue(treeRoot, child.FullPath);
+
+                    // verify it's a list
+                    List<object> valueList = (List<object>)value;
+                    try
+                    {
+                        valueList = (List<object>)value;
+                    }
+                    catch
+                    {
+                        logger.debug("...not a list");
+                        return false;
+                    }
+
+                    // verify count
+                    if (valueList.Count != topSig.count)
+                    {
+                        logger.debug($"...failed list count ({valueList.Count} != {topSig.count})");
+                        return false;
+                    }
+                    logger.debug($"...matched list count ({valueList.Count})");
+
+                    var elementType = valueList[0].GetType();
+                    if (elementType != topSig.subtype)
+                    {
+                        logger.debug($"...failed subtype ({elementType} != {topSig.subtype}");
+                        return false;
+                    };
+                    logger.debug($"...matched subtype ({elementType})");
+
+                    logger.debug($"{child.Text} appears to be a matching leaf node!");
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        Tuple<TreeNode, List<string>> findPivot(TreeNode node, List<Signature> sigList)
+        {
+            if (node is null)
+                return null; 
+
+            // basically these are dict keys
+            var children = node.Nodes;
+
+            // do all children contain sigList?
+            bool allMatched = true;
+            for (int i = 0; i < children.Count; i++)
+            {
+                var child = children[i];
+
+                logger.debug($"test if {child} contains sigList: " + Util.joinAny(sigList));
+                var match = nodeContainsPath(child, sigList);
+                if (match)
+                {
+                    logger.debug($"MATCH: {child} contained sigList");
+                }
+                else
+                {
+                    logger.debug("child failed...ascending");
+                    allMatched = false;
+                    break;
+                }
+            }
+
+            if (allMatched)
+            {
+                logger.debug($"success! all children of {node.Text} contained signature list " + Util.joinAny(sigList));
+
+                // extract final path
+                List<string> path = new();
+                foreach (var sig in sigList)
+                    path.Add(sig.name);
+
+                logger.debug($"findPivot: returning {node.Text} and path: " + Util.joinAny(path));
+                return new Tuple<TreeNode, List<string>>(node, path);
+            }
+            
+            logger.debug($"no child of {node.Text} contained sigList");
+            if (node.Parent is null)
+            {
+                logger.debug("out of ancestors, out of luck");
+                return null;
+            }
+
+            logger.debug($"climbing further up ancestry");
+            var parent = node.Parent;
+            var parentSig = new Signature() { type = parent.GetType(), name = parent.Text };
+            var parentSigList = sigList.Prepend(parentSig).ToList();
+            return findPivot(parent, parentSigList);
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -601,7 +852,11 @@ namespace JSONExtractor
             selectedPathnames.Sort();
             labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
 
-            if (checkBoxDedupeFilenames.Checked)
+            if (!checkBoxDedupeFilenames.Checked)
+            {
+                dedupedPathnames = selectedPathnames;
+            }
+            else
             {
                 ////////////////////////////////////////////////////////////////
                 // parse Within list (on comma if found, else whitespace)
@@ -702,46 +957,6 @@ namespace JSONExtractor
 
                 backgroundWorkerExtraction.RunWorkerAsync();
             }
-        }
-
-        ////////////////////////////////////////////////////////////////////////
-        // Saved Configurations
-        ////////////////////////////////////////////////////////////////////////
-
-        private void buttonSaveConfig_Click(object sender, EventArgs e)
-        {
-            DialogResult ok = saveFileDialogConfig.ShowDialog();
-            if (ok != DialogResult.OK)
-                return;
-
-            Config config = new Config();
-            foreach (var ea in extractAttributes)
-                config.extractAttributes.Add(ExtractAttribute.Serialized.serialize(ea));
-            foreach (var fa in filterAttributes)
-                config.filterAttributes.Add(FilterAttribute.Serialized.serialize(fa));
-
-            using StreamWriter configFile = new(saveFileDialogConfig.FileName);
-                configFile.WriteLine(JsonConvert.SerializeObject(config));
-
-            logger.info($"saved config to {saveFileDialogConfig.FileName}");
-        }
-
-        private void buttonLoadConfig_Click(object sender, EventArgs e)
-        {
-            DialogResult ok = openFileDialogConfig.ShowDialog();
-            if (ok != DialogResult.OK)
-                return;
-
-            string json = Util.loadText(saveFileDialogConfig.FileName);
-            Config config = JsonConvert.DeserializeObject<Config>(json);
-
-            filterAttributes.Clear();
-            extractAttributes.Clear();
-
-            foreach (var fas in config.filterAttributes)
-                filterAttributes.Append(fas.deserialize());
-            foreach (var eas in config.extractAttributes)
-                extractAttributes.Append(eas.deserialize());
         }
 
         ////////////////////////////////////////////////////////////////////////

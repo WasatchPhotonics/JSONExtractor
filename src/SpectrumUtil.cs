@@ -65,7 +65,7 @@ namespace JSONExtractor
                     return null;
 
                 var l = (List<object>)value;
-                List<double> values = l.OfType<double>().ToList();
+                List<double> values = l.Cast<double>().ToList();
                 if (values.Count == 0)
                     return null;
 

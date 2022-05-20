@@ -22,22 +22,41 @@ namespace JSONExtractor
     class ExtractAttribute
     {
         /// <summary>
-        /// Arrays in the JSON data can be aggregated (rolled-up) in extracts 
-        /// using any of the following functions.  Most are intuitive, but for
-        /// the rest:
-        /// 
-        /// - CommaDelimited : output the array as a comma-delimited string
-        /// - TableRows : append to end of output as an independent row-ordered table
-        /// - TableCols : append to end of output as an independent column-ordered table
+        /// Allows aggregating a single, simple numeric list (1D vector) in the 
+        /// extracted report.
         /// </summary>
-        public enum AggregateType { Count, Sum, Mean, StdDev, Min, Max, CommaDelimited, PipeDelimited, TableRows, TableCols };
+        /// <remarks>
+        /// Arrays in the JSON data (simple lists of native numeric values, 
+        /// mapped to a single dict key) can be aggregated in extracts using any
+        /// of the following functions.  Most are intuitive, but for the rest:
+        /// 
+        /// - CommaDelimited : output the array as a comma-delimited string ("1,2,3")
+        /// - CommaDelimited : output the array as a pipe-delimited string ("1|2|3")
+        /// - TableRows : append to end of output as an independent row-ordered table (foo, 1, 2, 3)
+        /// - TableCols : append to end of output as an independent column-ordered table
+        ///
+        /// It is important to recognize that these aggregations are performed on 
+        /// the contents OF ONE LIST: for multi-list rollups, see RollupType.
+        /// </remarks>
+        public enum AggregateType { TableCols, TableRows, Count, Sum, Mean, Median, StdDev, Min, Max, PipeDelimited, CommaDelimited };
+
+        /// <summary>
+        /// Allows collating multiple lists (2D input data) together into a new 
+        /// 1D virtual list (which may itself be then aggregated using 
+        /// AggregateType).
+        /// </summary>
+        public enum CollateType { Mean, Median, StdDev };
 
         // public Properties are auto-populated to the bound DataGridView in definition order
         public string label { get; set; }
         public int precision { get; set; }
         public string defaultValue { get; set; }
         public AggregateType? aggregateType { get; set; } = null;
+        public CollateType? collateType { get; set; } = null;
         public string jsonFullPath { get; set; }
+
+        public string collatePivotPath { get; set; }
+        public List<string> collationPath { get; set; }
 
         // used for TableCols/Rows AggregateTypes
         List<List<double>> tableData = new List<List<double>>();
@@ -105,7 +124,7 @@ namespace JSONExtractor
             if (aggregateType == AggregateType.Count)
                 return l.Count.ToString();
 
-            List<double> values = l.OfType<double>().ToList();
+            List<double> values = l.Cast<double>().ToList();
             if (values.Count == 0)
                 return formatDouble(0);
 
@@ -124,7 +143,9 @@ namespace JSONExtractor
             else if (aggregateType == AggregateType.Max)
                 result = values.Max();
             else if (aggregateType == AggregateType.StdDev)
-                result = Util.standardDeviation(values);
+                result = Util.stdev(values);
+            else if (aggregateType == AggregateType.Median)
+                result = Util.median(values);
 
             return formatDouble(result);
         }
@@ -154,7 +175,7 @@ namespace JSONExtractor
             if (l.Count == 0)
                 return;
 
-            List<double> values = l.OfType<double>().ToList();
+            List<double> values = l.Cast<double>().ToList();
 
             if (interpolatedAxis != null)
             {
@@ -298,9 +319,9 @@ namespace JSONExtractor
                     defaultValue = ea.defaultValue,
                     aggregateType = ea.aggregateType.ToString(),
                     jsonFullPath = ea.jsonFullPath,
-                    wavecalJsonPath = ea.wavecalGenerator.wavecalJsonPath,
-                    excitationJsonPath = ea.wavecalGenerator.excitationJsonPath,
-                    newX = ea.interpolatedAxis.newX
+                    wavecalJsonPath = ea.wavecalGenerator is null ? null : ea.wavecalGenerator.wavecalJsonPath,
+                    excitationJsonPath = ea.wavecalGenerator is null ? null : ea.wavecalGenerator.excitationJsonPath,
+                    newX = ea.interpolatedAxis is null ? null : ea.interpolatedAxis.newX
                 };
                 return ser;
             }
