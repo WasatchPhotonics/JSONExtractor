@@ -164,6 +164,7 @@ namespace JSONExtractor
             treeViewJSON.BeginUpdate();
             populateTreeView(treeRoot, rootNode);
             treeViewJSON.EndUpdate();
+            treeViewJSON.ShowNodeToolTips = true;
 
             rootNode.Expand();
         }
@@ -188,11 +189,19 @@ namespace JSONExtractor
                 }
                 else if (value is List<object>)
                 {
+                    // array leaf node
                     var tvn = treeNode.Nodes.Add(key + "[]");
                     tvn.ForeColor = SystemColors.HotTrack;
+                    var tt = Util.getJsonValueShortString(treeRoot, tvn.FullPath);
+                    tvn.ToolTipText = tt;
                 }
                 else
-                    treeNode.Nodes.Add(key);
+                {
+                    // scalar leaf node
+                    var tvn = treeNode.Nodes.Add(key);
+                    var tt = Util.getJsonValueShortString(treeRoot, tvn.FullPath).ToString();
+                    tvn.ToolTipText = tt;
+                }
             }
         }
 
@@ -519,9 +528,6 @@ namespace JSONExtractor
             processedCount = 0;
             skipCount = 0;
 
-            foreach (var fa in filterAttributes)
-                fa.rejectCount = 0;
-
             progressBarStatus.Maximum = dedupedPathnames.Count;
             progressBarStatus.Value = 0;
 
@@ -704,12 +710,38 @@ namespace JSONExtractor
 
         private void buttonSaveConfig_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Save Config not yet implemented");
+            DialogResult ok = saveFileDialogConfig.ShowDialog();
+            if (ok != DialogResult.OK)
+                return;
+
+            Config config = new Config();
+            foreach (var ea in extractAttributes)
+                config.extractAttributes.Add(ExtractAttribute.Serialized.serialize(ea));
+            foreach (var fa in filterAttributes)
+                config.filterAttributes.Add(FilterAttribute.Serialized.serialize(fa));
+
+            using StreamWriter configFile = new(saveFileDialogConfig.FileName);
+                configFile.WriteLine(JsonConvert.SerializeObject(config));
+
+            logger.info($"saved config to {saveFileDialogConfig.FileName}");
         }
 
         private void buttonLoadConfig_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Load Config not yet implemented");
+            DialogResult ok = openFileDialogConfig.ShowDialog();
+            if (ok != DialogResult.OK)
+                return;
+
+            string json = Util.loadText(saveFileDialogConfig.FileName);
+            Config config = JsonConvert.DeserializeObject<Config>(json);
+
+            filterAttributes.Clear();
+            extractAttributes.Clear();
+
+            foreach (var fas in config.filterAttributes)
+                filterAttributes.Append(fas.deserialize());
+            foreach (var eas in config.extractAttributes)
+                extractAttributes.Append(eas.deserialize());
         }
 
         ////////////////////////////////////////////////////////////////////////

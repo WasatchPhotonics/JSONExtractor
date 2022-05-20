@@ -15,8 +15,8 @@ namespace JSONExtractor
     {
         public class WavecalGenerator
         {
-            string wavecalJsonPath;
-            string excitationJsonPath;
+            public string wavecalJsonPath;
+            public string excitationJsonPath;
 
             Logger logger = Logger.getInstance();
 

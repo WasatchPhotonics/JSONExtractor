@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
 
 namespace JSONExtractor
 {
@@ -271,6 +272,56 @@ namespace JSONExtractor
                 sb.AppendLine();
             }
             return sb.ToString();
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // De/Serialization
+        ////////////////////////////////////////////////////////////////////////
+
+        public class Serialized
+        {
+            public string label { get; set; }
+            public int precision { get; set; }
+            public string defaultValue { get; set; }
+            public string aggregateType { get; set; }
+            public string jsonFullPath { get; set; }
+            public string wavecalJsonPath { get; set; }
+            public string excitationJsonPath { get; set; }
+            public List<double> newX { get; set; }
+
+            public static Serialized serialize(ExtractAttribute ea)
+            {
+                var ser = new Serialized()
+                {
+                    label = ea.label,
+                    precision = ea.precision,
+                    defaultValue = ea.defaultValue,
+                    aggregateType = ea.aggregateType.ToString(),
+                    jsonFullPath = ea.jsonFullPath,
+                    wavecalJsonPath = ea.wavecalGenerator.wavecalJsonPath,
+                    excitationJsonPath = ea.wavecalGenerator.excitationJsonPath,
+                    newX = ea.interpolatedAxis.newX
+                };
+                return ser;
+            }
+
+            public ExtractAttribute deserialize()
+            {
+                AggregateType aggregateTypeEnum = AggregateType.Count;
+                Enum.TryParse(aggregateType, out aggregateTypeEnum);
+
+                ExtractAttribute ea = new()
+                {
+                    aggregateType = aggregateTypeEnum,
+                    label = label,
+                    precision = precision,
+                    defaultValue = defaultValue,
+                    jsonFullPath = jsonFullPath,
+                    wavecalGenerator = new(wavecalJsonPath, excitationJsonPath),
+                    interpolatedAxis = new(newX)
+                };
+                return ea;
+            }
         }
     }
 }

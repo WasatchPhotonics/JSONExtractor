@@ -54,6 +54,17 @@ namespace JSONExtractor
             this.labelSelectedCount = new System.Windows.Forms.Label();
             this.labelSkippedCount = new System.Windows.Forms.Label();
             this.labelExtractedCount = new System.Windows.Forms.Label();
+            this.tabPageInterpolation = new System.Windows.Forms.TabPage();
+            this.groupBoxInterpolation = new System.Windows.Forms.GroupBox();
+            this.tableLayoutPanel7 = new System.Windows.Forms.TableLayoutPanel();
+            this.numericUpDownInterpolationStart = new System.Windows.Forms.NumericUpDown();
+            this.numericUpDownInterpolationIncr = new System.Windows.Forms.NumericUpDown();
+            this.numericUpDownInterpolationEnd = new System.Windows.Forms.NumericUpDown();
+            this.label10 = new System.Windows.Forms.Label();
+            this.label12 = new System.Windows.Forms.Label();
+            this.label13 = new System.Windows.Forms.Label();
+            this.buttonUseCoefficients = new System.Windows.Forms.Button();
+            this.buttonExcitation = new System.Windows.Forms.Button();
             this.tabPageConfig = new System.Windows.Forms.TabPage();
             this.groupBox9 = new System.Windows.Forms.GroupBox();
             this.tableLayoutPanel3 = new System.Windows.Forms.TableLayoutPanel();
@@ -101,16 +112,6 @@ namespace JSONExtractor
             this.label8 = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
             this.checkBoxInterpolate = new System.Windows.Forms.CheckBox();
-            this.groupBoxInterpolation = new System.Windows.Forms.GroupBox();
-            this.tableLayoutPanel7 = new System.Windows.Forms.TableLayoutPanel();
-            this.numericUpDownInterpolationStart = new System.Windows.Forms.NumericUpDown();
-            this.numericUpDownInterpolationIncr = new System.Windows.Forms.NumericUpDown();
-            this.numericUpDownInterpolationEnd = new System.Windows.Forms.NumericUpDown();
-            this.label10 = new System.Windows.Forms.Label();
-            this.label12 = new System.Windows.Forms.Label();
-            this.label13 = new System.Windows.Forms.Label();
-            this.buttonUseCoefficients = new System.Windows.Forms.Button();
-            this.buttonExcitation = new System.Windows.Forms.Button();
             this.splitContainerFilterVsAttributeTables = new System.Windows.Forms.SplitContainer();
             this.groupBox5 = new System.Windows.Forms.GroupBox();
             this.dataGridViewFilters = new System.Windows.Forms.DataGridView();
@@ -126,7 +127,8 @@ namespace JSONExtractor
             this.folderBrowserDialogInputDir = new System.Windows.Forms.FolderBrowserDialog();
             this.backgroundWorkerExtraction = new System.ComponentModel.BackgroundWorker();
             this.saveFileDialogExtract = new System.Windows.Forms.SaveFileDialog();
-            this.tabPageInterpolation = new System.Windows.Forms.TabPage();
+            this.saveFileDialogConfig = new System.Windows.Forms.SaveFileDialog();
+            this.openFileDialogConfig = new System.Windows.Forms.OpenFileDialog();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerTopVsBottom)).BeginInit();
             this.splitContainerTopVsBottom.Panel1.SuspendLayout();
             this.splitContainerTopVsBottom.Panel2.SuspendLayout();
@@ -144,6 +146,12 @@ namespace JSONExtractor
             this.tabPageExtract.SuspendLayout();
             this.groupBox8.SuspendLayout();
             this.tableLayoutPanel1.SuspendLayout();
+            this.tabPageInterpolation.SuspendLayout();
+            this.groupBoxInterpolation.SuspendLayout();
+            this.tableLayoutPanel7.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationStart)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationIncr)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationEnd)).BeginInit();
             this.tabPageConfig.SuspendLayout();
             this.groupBox9.SuspendLayout();
             this.tableLayoutPanel3.SuspendLayout();
@@ -165,11 +173,6 @@ namespace JSONExtractor
             this.groupBox7.SuspendLayout();
             this.tableLayoutPanel6.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownExtractAttributePrecision)).BeginInit();
-            this.groupBoxInterpolation.SuspendLayout();
-            this.tableLayoutPanel7.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationStart)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationIncr)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationEnd)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerFilterVsAttributeTables)).BeginInit();
             this.splitContainerFilterVsAttributeTables.Panel1.SuspendLayout();
             this.splitContainerFilterVsAttributeTables.Panel2.SuspendLayout();
@@ -180,7 +183,6 @@ namespace JSONExtractor
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewAttributes)).BeginInit();
             this.tableLayoutPanelProgressAndLog.SuspendLayout();
             this.groupBoxEventLog.SuspendLayout();
-            this.tabPageInterpolation.SuspendLayout();
             this.SuspendLayout();
             // 
             // splitContainerTopVsBottom
@@ -504,6 +506,168 @@ namespace JSONExtractor
             this.labelExtractedCount.Size = new System.Drawing.Size(136, 32);
             this.labelExtractedCount.TabIndex = 5;
             this.labelExtractedCount.Text = "Extracted: 0";
+            // 
+            // tabPageInterpolation
+            // 
+            this.tabPageInterpolation.Controls.Add(this.groupBoxInterpolation);
+            this.tabPageInterpolation.Location = new System.Drawing.Point(43, 4);
+            this.tabPageInterpolation.Name = "tabPageInterpolation";
+            this.tabPageInterpolation.Padding = new System.Windows.Forms.Padding(3);
+            this.tabPageInterpolation.Size = new System.Drawing.Size(312, 969);
+            this.tabPageInterpolation.TabIndex = 5;
+            this.tabPageInterpolation.Text = "Interpolation";
+            this.tabPageInterpolation.UseVisualStyleBackColor = true;
+            // 
+            // groupBoxInterpolation
+            // 
+            this.groupBoxInterpolation.Controls.Add(this.tableLayoutPanel7);
+            this.groupBoxInterpolation.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.groupBoxInterpolation.Location = new System.Drawing.Point(3, 3);
+            this.groupBoxInterpolation.Margin = new System.Windows.Forms.Padding(5);
+            this.groupBoxInterpolation.Name = "groupBoxInterpolation";
+            this.groupBoxInterpolation.Padding = new System.Windows.Forms.Padding(5);
+            this.groupBoxInterpolation.Size = new System.Drawing.Size(306, 963);
+            this.groupBoxInterpolation.TabIndex = 1;
+            this.groupBoxInterpolation.TabStop = false;
+            this.groupBoxInterpolation.Text = "Interpolation";
+            // 
+            // tableLayoutPanel7
+            // 
+            this.tableLayoutPanel7.ColumnCount = 2;
+            this.tableLayoutPanel7.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            this.tableLayoutPanel7.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            this.tableLayoutPanel7.Controls.Add(this.numericUpDownInterpolationStart, 1, 0);
+            this.tableLayoutPanel7.Controls.Add(this.numericUpDownInterpolationIncr, 1, 2);
+            this.tableLayoutPanel7.Controls.Add(this.numericUpDownInterpolationEnd, 1, 1);
+            this.tableLayoutPanel7.Controls.Add(this.label10, 0, 0);
+            this.tableLayoutPanel7.Controls.Add(this.label12, 0, 1);
+            this.tableLayoutPanel7.Controls.Add(this.label13, 0, 2);
+            this.tableLayoutPanel7.Controls.Add(this.buttonUseCoefficients, 0, 3);
+            this.tableLayoutPanel7.Controls.Add(this.buttonExcitation, 0, 4);
+            this.tableLayoutPanel7.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tableLayoutPanel7.Location = new System.Drawing.Point(5, 37);
+            this.tableLayoutPanel7.Margin = new System.Windows.Forms.Padding(5);
+            this.tableLayoutPanel7.Name = "tableLayoutPanel7";
+            this.tableLayoutPanel7.RowCount = 5;
+            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel7.Size = new System.Drawing.Size(296, 921);
+            this.tableLayoutPanel7.TabIndex = 0;
+            // 
+            // numericUpDownInterpolationStart
+            // 
+            this.numericUpDownInterpolationStart.Location = new System.Drawing.Point(77, 5);
+            this.numericUpDownInterpolationStart.Margin = new System.Windows.Forms.Padding(5);
+            this.numericUpDownInterpolationStart.Maximum = new decimal(new int[] {
+            4000,
+            0,
+            0,
+            0});
+            this.numericUpDownInterpolationStart.Name = "numericUpDownInterpolationStart";
+            this.numericUpDownInterpolationStart.Size = new System.Drawing.Size(143, 39);
+            this.numericUpDownInterpolationStart.TabIndex = 14;
+            this.numericUpDownInterpolationStart.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.numericUpDownInterpolationStart.Value = new decimal(new int[] {
+            400,
+            0,
+            0,
+            0});
+            // 
+            // numericUpDownInterpolationIncr
+            // 
+            this.numericUpDownInterpolationIncr.DecimalPlaces = 2;
+            this.numericUpDownInterpolationIncr.Location = new System.Drawing.Point(77, 103);
+            this.numericUpDownInterpolationIncr.Margin = new System.Windows.Forms.Padding(5);
+            this.numericUpDownInterpolationIncr.Name = "numericUpDownInterpolationIncr";
+            this.numericUpDownInterpolationIncr.Size = new System.Drawing.Size(143, 39);
+            this.numericUpDownInterpolationIncr.TabIndex = 16;
+            this.numericUpDownInterpolationIncr.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.numericUpDownInterpolationIncr.Value = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
+            // 
+            // numericUpDownInterpolationEnd
+            // 
+            this.numericUpDownInterpolationEnd.Location = new System.Drawing.Point(77, 54);
+            this.numericUpDownInterpolationEnd.Margin = new System.Windows.Forms.Padding(5);
+            this.numericUpDownInterpolationEnd.Maximum = new decimal(new int[] {
+            4000,
+            0,
+            0,
+            0});
+            this.numericUpDownInterpolationEnd.Name = "numericUpDownInterpolationEnd";
+            this.numericUpDownInterpolationEnd.Size = new System.Drawing.Size(143, 39);
+            this.numericUpDownInterpolationEnd.TabIndex = 15;
+            this.numericUpDownInterpolationEnd.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.numericUpDownInterpolationEnd.Value = new decimal(new int[] {
+            2400,
+            0,
+            0,
+            0});
+            // 
+            // label10
+            // 
+            this.label10.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.label10.AutoSize = true;
+            this.label10.Location = new System.Drawing.Point(5, 8);
+            this.label10.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(62, 32);
+            this.label10.TabIndex = 17;
+            this.label10.Text = "Start";
+            // 
+            // label12
+            // 
+            this.label12.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.label12.AutoSize = true;
+            this.label12.Location = new System.Drawing.Point(5, 57);
+            this.label12.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            this.label12.Name = "label12";
+            this.label12.Size = new System.Drawing.Size(54, 32);
+            this.label12.TabIndex = 18;
+            this.label12.Text = "End";
+            // 
+            // label13
+            // 
+            this.label13.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.label13.AutoSize = true;
+            this.label13.Location = new System.Drawing.Point(5, 106);
+            this.label13.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(53, 32);
+            this.label13.TabIndex = 19;
+            this.label13.Text = "Incr";
+            // 
+            // buttonUseCoefficients
+            // 
+            this.tableLayoutPanel7.SetColumnSpan(this.buttonUseCoefficients, 2);
+            this.buttonUseCoefficients.Location = new System.Drawing.Point(5, 152);
+            this.buttonUseCoefficients.Margin = new System.Windows.Forms.Padding(5);
+            this.buttonUseCoefficients.Name = "buttonUseCoefficients";
+            this.buttonUseCoefficients.Size = new System.Drawing.Size(200, 40);
+            this.buttonUseCoefficients.TabIndex = 20;
+            this.buttonUseCoefficients.Text = "Set Wavecal";
+            this.buttonUseCoefficients.UseVisualStyleBackColor = true;
+            this.buttonUseCoefficients.Click += new System.EventHandler(this.buttonUseCoefficients_Click);
+            // 
+            // buttonExcitation
+            // 
+            this.tableLayoutPanel7.SetColumnSpan(this.buttonExcitation, 2);
+            this.buttonExcitation.Location = new System.Drawing.Point(3, 200);
+            this.buttonExcitation.Name = "buttonExcitation";
+            this.buttonExcitation.Size = new System.Drawing.Size(200, 40);
+            this.buttonExcitation.TabIndex = 21;
+            this.buttonExcitation.Text = "Set Excitation";
+            this.toolTip1.SetToolTip(this.buttonExcitation, "If specified, interpolated axis will be in wavenumber rather than wavelength spac" +
+        "e");
+            this.buttonExcitation.UseVisualStyleBackColor = true;
+            this.buttonExcitation.Click += new System.EventHandler(this.buttonExcitation_Click);
             // 
             // tabPageConfig
             // 
@@ -1139,157 +1303,6 @@ namespace JSONExtractor
             this.checkBoxInterpolate.Text = "Interpolate";
             this.checkBoxInterpolate.UseVisualStyleBackColor = true;
             // 
-            // groupBoxInterpolation
-            // 
-            this.groupBoxInterpolation.Controls.Add(this.tableLayoutPanel7);
-            this.groupBoxInterpolation.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.groupBoxInterpolation.Location = new System.Drawing.Point(3, 3);
-            this.groupBoxInterpolation.Margin = new System.Windows.Forms.Padding(5);
-            this.groupBoxInterpolation.Name = "groupBoxInterpolation";
-            this.groupBoxInterpolation.Padding = new System.Windows.Forms.Padding(5);
-            this.groupBoxInterpolation.Size = new System.Drawing.Size(306, 963);
-            this.groupBoxInterpolation.TabIndex = 1;
-            this.groupBoxInterpolation.TabStop = false;
-            this.groupBoxInterpolation.Text = "Interpolation";
-            // 
-            // tableLayoutPanel7
-            // 
-            this.tableLayoutPanel7.ColumnCount = 2;
-            this.tableLayoutPanel7.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this.tableLayoutPanel7.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this.tableLayoutPanel7.Controls.Add(this.numericUpDownInterpolationStart, 1, 0);
-            this.tableLayoutPanel7.Controls.Add(this.numericUpDownInterpolationIncr, 1, 2);
-            this.tableLayoutPanel7.Controls.Add(this.numericUpDownInterpolationEnd, 1, 1);
-            this.tableLayoutPanel7.Controls.Add(this.label10, 0, 0);
-            this.tableLayoutPanel7.Controls.Add(this.label12, 0, 1);
-            this.tableLayoutPanel7.Controls.Add(this.label13, 0, 2);
-            this.tableLayoutPanel7.Controls.Add(this.buttonUseCoefficients, 0, 3);
-            this.tableLayoutPanel7.Controls.Add(this.buttonExcitation, 0, 4);
-            this.tableLayoutPanel7.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tableLayoutPanel7.Location = new System.Drawing.Point(5, 37);
-            this.tableLayoutPanel7.Margin = new System.Windows.Forms.Padding(5);
-            this.tableLayoutPanel7.Name = "tableLayoutPanel7";
-            this.tableLayoutPanel7.RowCount = 5;
-            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel7.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
-            this.tableLayoutPanel7.Size = new System.Drawing.Size(296, 921);
-            this.tableLayoutPanel7.TabIndex = 0;
-            // 
-            // numericUpDownInterpolationStart
-            // 
-            this.numericUpDownInterpolationStart.Location = new System.Drawing.Point(77, 5);
-            this.numericUpDownInterpolationStart.Margin = new System.Windows.Forms.Padding(5);
-            this.numericUpDownInterpolationStart.Maximum = new decimal(new int[] {
-            4000,
-            0,
-            0,
-            0});
-            this.numericUpDownInterpolationStart.Name = "numericUpDownInterpolationStart";
-            this.numericUpDownInterpolationStart.Size = new System.Drawing.Size(143, 39);
-            this.numericUpDownInterpolationStart.TabIndex = 14;
-            this.numericUpDownInterpolationStart.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
-            this.numericUpDownInterpolationStart.Value = new decimal(new int[] {
-            400,
-            0,
-            0,
-            0});
-            // 
-            // numericUpDownInterpolationIncr
-            // 
-            this.numericUpDownInterpolationIncr.DecimalPlaces = 2;
-            this.numericUpDownInterpolationIncr.Location = new System.Drawing.Point(77, 103);
-            this.numericUpDownInterpolationIncr.Margin = new System.Windows.Forms.Padding(5);
-            this.numericUpDownInterpolationIncr.Name = "numericUpDownInterpolationIncr";
-            this.numericUpDownInterpolationIncr.Size = new System.Drawing.Size(143, 39);
-            this.numericUpDownInterpolationIncr.TabIndex = 16;
-            this.numericUpDownInterpolationIncr.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
-            this.numericUpDownInterpolationIncr.Value = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-            // 
-            // numericUpDownInterpolationEnd
-            // 
-            this.numericUpDownInterpolationEnd.Location = new System.Drawing.Point(77, 54);
-            this.numericUpDownInterpolationEnd.Margin = new System.Windows.Forms.Padding(5);
-            this.numericUpDownInterpolationEnd.Maximum = new decimal(new int[] {
-            4000,
-            0,
-            0,
-            0});
-            this.numericUpDownInterpolationEnd.Name = "numericUpDownInterpolationEnd";
-            this.numericUpDownInterpolationEnd.Size = new System.Drawing.Size(143, 39);
-            this.numericUpDownInterpolationEnd.TabIndex = 15;
-            this.numericUpDownInterpolationEnd.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
-            this.numericUpDownInterpolationEnd.Value = new decimal(new int[] {
-            2400,
-            0,
-            0,
-            0});
-            // 
-            // label10
-            // 
-            this.label10.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            this.label10.AutoSize = true;
-            this.label10.Location = new System.Drawing.Point(5, 8);
-            this.label10.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(62, 32);
-            this.label10.TabIndex = 17;
-            this.label10.Text = "Start";
-            // 
-            // label12
-            // 
-            this.label12.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            this.label12.AutoSize = true;
-            this.label12.Location = new System.Drawing.Point(5, 57);
-            this.label12.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(54, 32);
-            this.label12.TabIndex = 18;
-            this.label12.Text = "End";
-            // 
-            // label13
-            // 
-            this.label13.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            this.label13.AutoSize = true;
-            this.label13.Location = new System.Drawing.Point(5, 106);
-            this.label13.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(53, 32);
-            this.label13.TabIndex = 19;
-            this.label13.Text = "Incr";
-            // 
-            // buttonUseCoefficients
-            // 
-            this.tableLayoutPanel7.SetColumnSpan(this.buttonUseCoefficients, 2);
-            this.buttonUseCoefficients.Location = new System.Drawing.Point(5, 152);
-            this.buttonUseCoefficients.Margin = new System.Windows.Forms.Padding(5);
-            this.buttonUseCoefficients.Name = "buttonUseCoefficients";
-            this.buttonUseCoefficients.Size = new System.Drawing.Size(200, 40);
-            this.buttonUseCoefficients.TabIndex = 20;
-            this.buttonUseCoefficients.Text = "Set Wavecal";
-            this.buttonUseCoefficients.UseVisualStyleBackColor = true;
-            this.buttonUseCoefficients.Click += new System.EventHandler(this.buttonUseCoefficients_Click);
-            // 
-            // buttonExcitation
-            // 
-            this.tableLayoutPanel7.SetColumnSpan(this.buttonExcitation, 2);
-            this.buttonExcitation.Location = new System.Drawing.Point(3, 200);
-            this.buttonExcitation.Name = "buttonExcitation";
-            this.buttonExcitation.Size = new System.Drawing.Size(200, 40);
-            this.buttonExcitation.TabIndex = 21;
-            this.buttonExcitation.Text = "Set Excitation";
-            this.toolTip1.SetToolTip(this.buttonExcitation, "If specified, interpolated axis will be in wavenumber rather than wavelength spac" +
-        "e");
-            this.buttonExcitation.UseVisualStyleBackColor = true;
-            this.buttonExcitation.Click += new System.EventHandler(this.buttonExcitation_Click);
-            // 
             // splitContainerFilterVsAttributeTables
             // 
             this.splitContainerFilterVsAttributeTables.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -1452,16 +1465,16 @@ namespace JSONExtractor
             this.saveFileDialogExtract.Filter = "CSV Files (*.csv)|*.csv";
             this.saveFileDialogExtract.Title = "Run Extract";
             // 
-            // tabPageInterpolation
+            // saveFileDialogConfig
             // 
-            this.tabPageInterpolation.Controls.Add(this.groupBoxInterpolation);
-            this.tabPageInterpolation.Location = new System.Drawing.Point(43, 4);
-            this.tabPageInterpolation.Name = "tabPageInterpolation";
-            this.tabPageInterpolation.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPageInterpolation.Size = new System.Drawing.Size(312, 969);
-            this.tabPageInterpolation.TabIndex = 5;
-            this.tabPageInterpolation.Text = "Interpolation";
-            this.tabPageInterpolation.UseVisualStyleBackColor = true;
+            this.saveFileDialogConfig.DefaultExt = "json";
+            this.saveFileDialogConfig.Title = "Select where your configuration should be saved";
+            // 
+            // openFileDialogConfig
+            // 
+            this.openFileDialogConfig.DefaultExt = "json";
+            this.openFileDialogConfig.FileName = "config.json";
+            this.openFileDialogConfig.Title = "Select the configuration you wish to load";
             // 
             // Form1
             // 
@@ -1496,6 +1509,13 @@ namespace JSONExtractor
             this.groupBox8.ResumeLayout(false);
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
+            this.tabPageInterpolation.ResumeLayout(false);
+            this.groupBoxInterpolation.ResumeLayout(false);
+            this.tableLayoutPanel7.ResumeLayout(false);
+            this.tableLayoutPanel7.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationStart)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationIncr)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationEnd)).EndInit();
             this.tabPageConfig.ResumeLayout(false);
             this.tabPageConfig.PerformLayout();
             this.groupBox9.ResumeLayout(false);
@@ -1521,12 +1541,6 @@ namespace JSONExtractor
             this.tableLayoutPanel6.ResumeLayout(false);
             this.tableLayoutPanel6.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownExtractAttributePrecision)).EndInit();
-            this.groupBoxInterpolation.ResumeLayout(false);
-            this.tableLayoutPanel7.ResumeLayout(false);
-            this.tableLayoutPanel7.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationStart)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationIncr)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterpolationEnd)).EndInit();
             this.splitContainerFilterVsAttributeTables.Panel1.ResumeLayout(false);
             this.splitContainerFilterVsAttributeTables.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerFilterVsAttributeTables)).EndInit();
@@ -1538,7 +1552,6 @@ namespace JSONExtractor
             this.tableLayoutPanelProgressAndLog.ResumeLayout(false);
             this.groupBoxEventLog.ResumeLayout(false);
             this.groupBoxEventLog.PerformLayout();
-            this.tabPageInterpolation.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -1642,6 +1655,8 @@ namespace JSONExtractor
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
         private System.Windows.Forms.Button buttonExcitation;
         private System.Windows.Forms.TabPage tabPageInterpolation;
+        private System.Windows.Forms.SaveFileDialog saveFileDialogConfig;
+        private System.Windows.Forms.OpenFileDialog openFileDialogConfig;
     }
 }
 

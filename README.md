@@ -37,10 +37,10 @@ So now there is one :-)
 
 # Backlog
 
-- before/after comparator for dates
-- add filename as implicit attribute for filtering
+- implement AWS S3 sync
+- add mouseOver of "actual data" for JSON template fields
 - save/load configs (filter and extract sets)
-- interpolate spectral data to fixed x-axis
+- before/after comparator for dates
 
 # Architecture
 

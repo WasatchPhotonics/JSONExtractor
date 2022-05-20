@@ -18,13 +18,13 @@ namespace JSONExtractor
         public bool nullOk { get; set; }
         public bool negate { get; set; }    
         public bool sufficient { get; set; }
-        public int rejectCount { get; set; }
 
         public string jsonFullPath;
+        public bool isFilenameFilter;
+
         Regex re;
         DateTime dateThreshold;
         bool dateValid = false;
-        public bool isFilenameFilter;
 
         Logger logger = Logger.getInstance();
 
@@ -124,9 +124,52 @@ namespace JSONExtractor
             if (!pass && nullOk && (value is null || value.Length == 0))
                 pass = true;
 
-            if (!pass)
-                rejectCount++;
             return pass;
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // De/Serialization
+        ////////////////////////////////////////////////////////////////////////
+
+        public class Serialized
+        {
+            public string filterType { get; set; }
+            public string name { get; set; }
+            public string pattern { get; set; }
+            public bool nullOk { get; set; }
+            public bool negate { get; set; }
+            public bool sufficient { get; set; }
+            public string jsonFullPath { get; set; }
+            public bool isFilenameFilter { get; set; }
+
+            public static Serialized serialize(FilterAttribute fa)
+            {
+                var ser = new Serialized()
+                { 
+                    filterType = fa.filterType.ToString(),
+                    name = fa.name,
+                    pattern = fa.pattern,
+                    nullOk = fa.nullOk,
+                    negate = fa.negate,
+                    sufficient = fa.sufficient,
+                    jsonFullPath = fa.jsonFullPath,
+                    isFilenameFilter = fa.isFilenameFilter
+                };
+                return ser;
+            }
+
+            public FilterAttribute deserialize()
+            {
+                FilterType filterTypeEnum = FilterType.Empty;
+                Enum.TryParse(filterType, out filterTypeEnum);
+                FilterAttribute fa = new(jsonFullPath, filterTypeEnum, pattern, negate)
+                {
+                    nullOk = nullOk,
+                    sufficient = sufficient,
+                    isFilenameFilter = isFilenameFilter
+                };
+                return fa;
+            }
         }
     }
 }

@@ -109,6 +109,11 @@ namespace JSONExtractor
         {
             public List<double> newX;
 
+            public Axis(List<double> newX)
+            {
+                this.newX = newX; 
+            }
+
             public Axis(int start, int end, double incr)
             {
                 newX = new();

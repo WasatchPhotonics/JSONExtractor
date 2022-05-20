@@ -116,5 +116,35 @@ namespace JSONExtractor
             if (o is Int16) return (Int16)o;
             return Double.NaN;
         }
+
+        /// <summary>
+        /// Instead of returning the actual object at a given path (of type 
+        /// Double[] or whatever with 2048 elements), return a string which is 
+        /// "representative" of the object contents. Used for mouseOver tooltips.
+        /// </summary>
+        public static string getJsonValueShortString(IDictionary<string, object> node, string jsonPath)
+        {
+            var obj = getJsonValue(node, jsonPath);
+
+            // handle scalars
+            if (obj is not List<object>)
+                return obj.ToString();
+
+            // handle lists
+            var l = (List<object>)obj;
+            List<string> tok = new();
+            if (l.Count <= 5)
+                for (int i = 0; i < l.Count; i++)
+                    tok.Add(l[i].ToString());
+            else
+            {
+                for (int i = 0; i < 3; i++)
+                    tok.Add(l[i].ToString());
+                tok.Add("...");
+                for (int i = l.Count - 3; i < l.Count; i++)
+                    tok.Add(l[i].ToString());
+            }
+            return "[" + string.Join(", ", tok) + "]";
+        }
     }
 }

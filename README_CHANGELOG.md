@@ -1,5 +1,8 @@
 # Changelog
 
+- 2022-05-19 1.2.2
+    - added TreeViewNode tooltips
+    - added Config
 - 2022-05-18 1.2.1
     - added SpectraUtil
     - refactored interpolation
