@@ -64,8 +64,7 @@ namespace JSONExtractor
                 if (value is null)
                     return null;
 
-                var l = (List<object>)value;
-                List<double> values = l.Cast<double>().ToList();
+                var values = Util.forceDouble((List<object>)value);
                 if (values.Count == 0)
                     return null;
 

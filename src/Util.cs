@@ -33,6 +33,14 @@ namespace JSONExtractor
             }
         }
 
+        public static List<double> forceDouble(List<object> l)
+        {
+            List<double> result = new List<double>(l.Count);
+            for (int i = 0; i < l.Count; i++)
+                result.Add(toDouble(l[i]));
+            return result;
+        }
+
         /// <summary>
         /// Given the root of a JSON object tree and a backslash-delimited path 
         /// of dictionary keys, returns the object at the end of the path.
