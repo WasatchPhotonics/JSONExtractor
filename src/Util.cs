@@ -159,5 +159,29 @@ namespace JSONExtractor
         {
             return string.Join(delim, things.Select(thing => thing.ToString()).ToArray());
         }
+
+        public static List<double> collateMean(List<List<double>> data)
+        {
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(data[i].Average());
+            return result;
+        }
+
+        public static List<double> collateStdev(List<List<double>> data)
+        {
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(stdev(data[i]));
+            return result;
+        }
+
+        public static List<double> collateMedian(List<List<double>> data)
+        {
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(median(data[i]));
+            return result;
+        }
     }
 }

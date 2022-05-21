@@ -40,8 +40,8 @@ namespace JSONExtractor
         List<double> recentCompletionTimesSec = new List<double>();
         const int COMPLETION_TIMES_WINDOW = 100;
 
-        TreeNode pivotNode = null;
-        List<string> collationPath = null;
+        TreeNode collatePivotNode = null;
+        List<string> collatePath = null;
 
         Logger logger = Logger.getInstance();
 
@@ -288,7 +288,6 @@ namespace JSONExtractor
                     buttonFilterAdd.Enabled = false;
                 return;
             }
-            logger.debug($"selected {tvn.FullPath}");
 
             buttonAddExtractAttribute.Enabled =
                 buttonFilterAdd.Enabled = true;
@@ -314,7 +313,6 @@ namespace JSONExtractor
             textBoxExtractAttributeDefault.Text = "";
 
             updateInterpolationControls();
-
             updateCollationControls(tvn);
         }
 
@@ -336,7 +334,7 @@ namespace JSONExtractor
             // todo: move to FilterAttribute
             string pattern = textBoxFilterPattern.Text;
             var filterType = (FilterAttribute.FilterType)Enum.Parse(
-                typeof(FilterAttribute.FilterType), comboBoxFilterType.SelectedItem.ToString());
+                typeof(FilterAttribute.FilterType), comboBoxFilterType.Text);
             switch (filterType)
             {
                 case FilterAttribute.FilterType.Regex:
@@ -412,8 +410,10 @@ namespace JSONExtractor
             // if collation is enabled, store the path to the pivot node, and the relative path to THIS attribute
             if (checkBoxCollate.Checked)
             {
-                ea.collatePivotPath = pivotNode.FullPath;
-                ea.collationPath = collationPath;
+                ea.collatePivotPath = collatePivotNode.FullPath;
+                ea.collatePath = collatePath;
+                ea.collateType = (ExtractAttribute.CollateType)Enum.Parse(
+                    typeof(ExtractAttribute.CollateType), comboBoxCollateType.Text);
             }
 
             logger.debug($"adding {ea}");
@@ -553,7 +553,7 @@ namespace JSONExtractor
             if (tvn.Text.EndsWith("[]"))
                 ea.aggregateType = (ExtractAttribute.AggregateType)Enum.Parse(
                     typeof(ExtractAttribute.AggregateType),
-                    comboBoxExtractAttributeAggregateType.SelectedItem.ToString());
+                    comboBoxExtractAttributeAggregateType.Text);
 
             return ea;
         }
@@ -583,39 +583,27 @@ namespace JSONExtractor
             extractAttributes.Insert(row + 1, ea);
         }
 
-        private void checkBoxCollate_CheckedChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        class Signature
-        {
-            public Type type;
-            public Type subtype;
-            public int count;
-            public string name;
-
-            public override string ToString() => $"<< type {type} name {name} (subtype {subtype}[cnt {count}]) >>";
-        }
+        private void checkBoxCollate_CheckedChanged(object sender, EventArgs e) { }
 
         void updateCollationControls(TreeNode tvn)
         {
-            pivotNode = null;
-            collationPath = null;
+            collatePivotNode = null;
+            collatePath = null;
+            bool collatePossible = false;
 
-            // can the current attribute be collated?
-            bool collationPossible = false;
-
-            // for now, just support arrays
-            if (tvn.Text.EndsWith("[]"))
+            if (tvn.Text.EndsWith("[]")) // for now, just support arrays
             {
                 List<string> pathTok = tvn.FullPath.Split('\\').ToList();
-
-                // what are we pointing at? an array of 1024 doubles?
                 List<object> l = (List<object>)Util.getJsonValue(treeRoot, tvn.FullPath);
 
-                Signature sigNode = new() { type = l.GetType(), subtype = l[0].GetType(), count = l.Count, name = pathTok.Last() };
-                List<Signature> sigList = new() { sigNode };
+                CollateSignature sigNode = new() 
+                { 
+                    type    = l.GetType(), 
+                    subtype = l[0].GetType(), 
+                    count   = l.Count, 
+                    name    = pathTok.Last() 
+                };
+                List<CollateSignature> sigList = new() { sigNode };
 
                 var parent = tvn.Parent;
                 if (parent.Parent != null)
@@ -623,40 +611,35 @@ namespace JSONExtractor
                     Tuple<TreeNode, List<string>> retval = findPivot(parent.Parent, sigList);
                     if (retval != null)
                     {
-                        collationPossible = true;
-                        pivotNode = retval.Item1;
-                        collationPath = retval.Item2;
+                        collatePossible = true;
+                        collatePivotNode = retval.Item1;
+                        collatePath = retval.Item2;
                     }
                 }
             }
 
-            if (collationPossible)
+            if (collatePossible)
             {
-                logger.debug($"collation possible for {tvn.Text}");
+                var hint = collatePivotNode + " -> " + Util.joinAny(collatePath);
+                logger.debug($"collation possible for {tvn.Text} ({hint})");
                 checkBoxCollate.Enabled =
                 comboBoxCollateType.Enabled = true;
                 comboBoxCollateType.SelectedIndex = 0;
+                toolTip1.SetToolTip(checkBoxCollate, hint);
             }
             else
             {
-                logger.debug($"collation not possible for {tvn.Text}");
                 checkBoxCollate.Enabled =
                 comboBoxCollateType.Enabled = false;
                 comboBoxCollateType.SelectedIndex = -1;
+                toolTip1.SetToolTip(checkBoxCollate, null);
             }
         }
 
-        bool nodeContainsPath(TreeNode tvn, List<Signature> sigList)
+        bool nodeContainsPath(TreeNode tvn, List<CollateSignature> sigList)
         {
-            if (tvn is null)
-                return false; 
-
-            Signature topSig = sigList.First();
+            var topSig = sigList.First();
             var topName = topSig.name;
-
-            // does tvn "have a" topName?
-            logger.debug($"looking for {topName} in {tvn.Text}");
-
             var children = tvn.Nodes;
             for (int i = 0; i < children.Count; i++)
             {
@@ -664,78 +647,40 @@ namespace JSONExtractor
                 if (child.Text != topSig.name)
                     continue;
 
-                logger.debug($"found {child.Text} in {tvn.Text}");
-
-                // are there further nodes to descend into, or should we be at the leaf?
                 if (sigList.Count > 1)
-                {
-                    var newSigList = sigList.Take(1).ToList();
-                    logger.debug($"descending into {child.Text} to confirm newSigList " + Util.joinAny(newSigList));
-                    return nodeContainsPath(child, newSigList);
+                    return nodeContainsPath(child, sigList.Take(1).ToList());
+
+                var value = Util.getJsonValue(treeRoot, child.FullPath);
+                List<object> valueList = (List<object>)value;
+                try {
+                    valueList = (List<object>)value;
+                } catch {
+                    return false;
                 }
-                else
-                {
-                    logger.debug("we're at the leaf, so verify child is a List<subtype> with correct count (already matched name)");
-                    var value = Util.getJsonValue(treeRoot, child.FullPath);
 
-                    // verify it's a list
-                    List<object> valueList = (List<object>)value;
-                    try
-                    {
-                        valueList = (List<object>)value;
-                    }
-                    catch
-                    {
-                        logger.debug("...not a list");
-                        return false;
-                    }
+                if (valueList.Count != topSig.count)
+                    return false;
 
-                    // verify count
-                    if (valueList.Count != topSig.count)
-                    {
-                        logger.debug($"...failed list count ({valueList.Count} != {topSig.count})");
-                        return false;
-                    }
-                    logger.debug($"...matched list count ({valueList.Count})");
-
-                    var elementType = valueList[0].GetType();
-                    if (elementType != topSig.subtype)
-                    {
-                        logger.debug($"...failed subtype ({elementType} != {topSig.subtype}");
-                        return false;
-                    };
-                    logger.debug($"...matched subtype ({elementType})");
-
-                    logger.debug($"{child.Text} appears to be a matching leaf node!");
-                    return true;
-                }
+                var elementType = valueList[0].GetType();
+                if (elementType != topSig.subtype)
+                    return false;
+                return true;
             }
             return false;
         }
 
-        Tuple<TreeNode, List<string>> findPivot(TreeNode node, List<Signature> sigList)
+        Tuple<TreeNode, List<string>> findPivot(TreeNode node, List<CollateSignature> sigList)
         {
             if (node is null)
                 return null; 
 
-            // basically these are dict keys
             var children = node.Nodes;
-
-            // do all children contain sigList?
             bool allMatched = true;
             for (int i = 0; i < children.Count; i++)
             {
                 var child = children[i];
-
-                logger.debug($"test if {child} contains sigList: " + Util.joinAny(sigList));
-                var match = nodeContainsPath(child, sigList);
-                if (match)
+                if (!nodeContainsPath(child, sigList))
                 {
-                    logger.debug($"MATCH: {child} contained sigList");
-                }
-                else
-                {
-                    logger.debug("child failed...ascending");
                     allMatched = false;
                     break;
                 }
@@ -743,29 +688,16 @@ namespace JSONExtractor
 
             if (allMatched)
             {
-                logger.debug($"success! all children of {node.Text} contained signature list " + Util.joinAny(sigList));
-
-                // extract final path
-                List<string> path = new();
-                foreach (var sig in sigList)
-                    path.Add(sig.name);
-
-                logger.debug($"findPivot: returning {node.Text} and path: " + Util.joinAny(path));
+                var path = sigList.Select(x => x.name).ToList();
                 return new Tuple<TreeNode, List<string>>(node, path);
             }
             
-            logger.debug($"no child of {node.Text} contained sigList");
             if (node.Parent is null)
-            {
-                logger.debug("out of ancestors, out of luck");
                 return null;
-            }
 
-            logger.debug($"climbing further up ancestry");
             var parent = node.Parent;
-            var parentSig = new Signature() { type = parent.GetType(), name = parent.Text };
-            var parentSigList = sigList.Prepend(parentSig).ToList();
-            return findPivot(parent, parentSigList);
+            var parentSig = new CollateSignature() { type = parent.GetType(), name = parent.Text };
+            return findPivot(parent, sigList.Prepend(parentSig).ToList());
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -1222,6 +1154,16 @@ namespace JSONExtractor
             {
                 logger.debug($"Attribute rows selected: {rows}");
             }
+        }
+
+        class CollateSignature
+        {
+            public Type type;
+            public Type subtype;
+            public int count;
+            public string name;
+
+            public override string ToString() => $"<< type {type} name {name} (subtype {subtype}[cnt {count}]) >>";
         }
     }
 }

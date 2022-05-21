@@ -56,7 +56,7 @@ namespace JSONExtractor
         public string jsonFullPath { get; set; }
 
         public string collatePivotPath { get; set; }
-        public List<string> collationPath { get; set; }
+        public List<string> collatePath;
 
         // used for TableCols/Rows AggregateTypes
         List<List<double>> tableData = new List<List<double>>();
@@ -115,7 +115,7 @@ namespace JSONExtractor
 
             if (aggregateType == AggregateType.TableCols || aggregateType == AggregateType.TableRows)
             {
-                logger.error($"use storeValue() for {aggregateType}");
+                logger.error($"use storeTable() for {aggregateType}");
                 return null;
             }
 
@@ -175,7 +175,11 @@ namespace JSONExtractor
             if (l.Count == 0)
                 return;
 
-            List<double> values = l.Cast<double>().ToList();
+            List<double> values;
+            if (collateType is null)
+                values = l.Cast<double>().ToList();
+            else
+                values = collateValues(jsonRoot);
 
             if (interpolatedAxis != null)
             {
@@ -188,6 +192,48 @@ namespace JSONExtractor
             tableKeys.Add(recordKey);
             if (tableDimension < values.Count)
                 tableDimension = values.Count;
+        }
+
+        List<double> collateValues(IDictionary<string, object> jsonRoot)
+        {
+            var pivotObj = Util.getJsonValue(jsonRoot, collatePivotPath);
+            IDictionary<string, object> pivotNode = (IDictionary<string, object>)pivotObj;
+
+            List<List<double>> data = new();
+
+            // iterate over the top-level keys of the pivot, loading 
+            // each target array into a new 2D matrix
+            foreach (var pair in pivotNode)
+            {
+                // append the configured collation path
+                var thisPath = collatePivotPath + "\\" + pair.Key + "\\" + Util.joinAny(collatePath, "\\");
+
+                logger.debug($"trying to collate {thisPath}");
+
+                var thisObj = Util.getJsonValue(jsonRoot, thisPath);
+                var l = (List<object>)thisObj;
+                if (l.Count == 0)
+                {
+                    logger.error($"found empty array at {thisPath} during collating");
+                    continue;
+                }
+
+                List<double> values = l.Cast<double>().ToList();
+                if (data.Count == 0)
+                    for (int i = 0; i < values.Count; i++)
+                        data.Add(new List<double>());
+                for (int i = 0; i < values.Count; i++)
+                    data[i].Add(values[i]);
+            }
+
+            if (collateType == CollateType.Mean)
+                return Util.collateMean(data);
+            else if (collateType == CollateType.Median)
+                return Util.collateMedian(data);
+            else if (collateType == CollateType.StdDev)
+                return Util.collateStdev(data);
+            else
+                return null;
         }
 
         /// <summary>
