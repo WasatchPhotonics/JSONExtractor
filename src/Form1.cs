@@ -645,7 +645,7 @@ namespace JSONExtractor
         bool nodeContainsPath(TreeNode tvn, List<Collect2DSignature> sigList)
         {
             var topSig = sigList.First();
-            var topName = topSig.name;
+            var topName = topSig.name; // may need to use this
             var children = tvn.Nodes;
             for (int i = 0; i < children.Count; i++)
             {
@@ -682,17 +682,22 @@ namespace JSONExtractor
 
             var children = node.Nodes;
             bool allMatched = true;
+            int matchCount = 0;
             for (int i = 0; i < children.Count; i++)
             {
                 var child = children[i];
-                if (!nodeContainsPath(child, sigList))
+                if (nodeContainsPath(child, sigList))
+                {
+                    matchCount++;
+                }
+                else
                 {
                     allMatched = false;
                     break;
                 }
             }
 
-            if (allMatched)
+            if (allMatched && matchCount > 1)
             {
                 var path = sigList.Select(x => x.name).ToList();
                 return new Tuple<TreeNode, List<string>>(node, path);
@@ -1196,6 +1201,20 @@ namespace JSONExtractor
             public string name;
 
             public override string ToString() => $"<< type {type} name {name} (subtype {subtype}[cnt {count}]) >>";
+        }
+
+        private void numericUpDownInterpolationStart_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
+        private void numericUpDownInterpolationEnd_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
+        private void numericUpDownInterpolationIncr_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
+
+        private void checkBoxDedupeFilenames_CheckedChanged(object sender, EventArgs e)
+        {
+            var cb = sender as CheckBox;
+            if (cb.Checked)
+                dedupeInputPathnames();
+            else
+                dedupedPathnames = selectedPathnames;
+            updateStartability();
         }
     }
 }

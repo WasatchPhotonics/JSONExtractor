@@ -368,6 +368,7 @@ namespace JSONExtractor
         "xpression\'s first match group (e.g., only the LAST time a particular serial numb" +
         "er was QC\'d)");
             this.checkBoxDedupeFilenames.UseVisualStyleBackColor = true;
+            this.checkBoxDedupeFilenames.CheckedChanged += new System.EventHandler(this.checkBoxDedupeFilenames_CheckedChanged);
             // 
             // buttonSelectInputDir
             // 
@@ -568,6 +569,7 @@ namespace JSONExtractor
             0,
             0,
             0});
+            this.numericUpDownInterpolationStart.ValueChanged += new System.EventHandler(this.numericUpDownInterpolationStart_ValueChanged);
             // 
             // numericUpDownInterpolationIncr
             // 
@@ -582,6 +584,7 @@ namespace JSONExtractor
             0,
             0,
             0});
+            this.numericUpDownInterpolationIncr.ValueChanged += new System.EventHandler(this.numericUpDownInterpolationIncr_ValueChanged);
             // 
             // numericUpDownInterpolationEnd
             // 
@@ -600,6 +603,7 @@ namespace JSONExtractor
             0,
             0,
             0});
+            this.numericUpDownInterpolationEnd.ValueChanged += new System.EventHandler(this.numericUpDownInterpolationEnd_ValueChanged);
             // 
             // label10
             // 

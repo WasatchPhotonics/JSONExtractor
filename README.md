@@ -37,9 +37,10 @@ So now there is one :-)
 
 # Backlog
 
-- test this instead of Interpolator
-    - https://numerics.mathdotnet.com/api/MathNet.Numerics.Interpolation/StepInterpolation.htm
-    - https://gist.github.com/AdnanCutura/478c27879d660b9150c0048eba823e81?permalink_comment_id=4163414#gistcomment-4163414
+- Collect2 should only take first space-delimited matching names? (See DarkBackgroundTest)
+- shift-click for range of fields in Collect2?
+- built-in chart for each TableCols / TableRows
+- built-in chart for template mouseOvers
 - before/after comparator for dates
 
 # Architecture
