@@ -4,6 +4,18 @@ using System.Linq;
 
 namespace JSONExtractor
 {
+    /// <summary>
+    /// Linear interpolation of a set of y-values from one x-axis to another.
+    /// </summary>
+    /// <remarks>
+    /// It seems weird that I should have to create this from scratch.  I tried 
+    /// using MathNET.Numerics.Interpolation, but for the life of me none of them
+    /// seemed to work for my data.  StepInterpolation was closest, but it 
+    /// introduced large "stair-steps" into the output data.  Others kept 
+    /// generating NaN or double.Max, or required pre-computed inputs that I 
+    /// don't have.
+    /// </remarks>
+    /// <see href="https://numerics.mathdotnet.com/api/MathNet.Numerics.Interpolation"/>
     class Interpolator
     {
         SortedDictionary<double, double> data;
@@ -108,12 +120,7 @@ namespace JSONExtractor
         public class Axis
         {
             public List<double> newX;
-
-            public Axis(List<double> newX)
-            {
-                this.newX = newX; 
-            }
-
+            public Axis(List<double> newX) { this.newX = newX; }
             public Axis(int start, int end, double incr)
             {
                 newX = new();
