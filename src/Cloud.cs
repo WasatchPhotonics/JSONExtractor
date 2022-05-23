@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using Amazon.S3;
 using Amazon.S3.Model;
+using System.Threading.Tasks;
 
 namespace JSONExtractor
 {
@@ -15,59 +16,56 @@ namespace JSONExtractor
         public string secretKey;
         public string bucket;
         public string cacheDir;
-        List<string> keys = new();
 
         Amazon.RegionEndpoint region = Amazon.RegionEndpoint.USEast2;
         AmazonS3Client client;
 
         Logger logger = Logger.getInstance();
 
-        public Cloud()
+        public Cloud(string accessKey, string secretKey, string bucket, string cacheDir)
         {
+            this.accessKey = accessKey;
+            this.secretKey = secretKey;
+            this.bucket = bucket;
+            this.cacheDir = cacheDir;
+
             client = new AmazonS3Client(accessKey, secretKey, region);
         }
 
-        async public void syncKeys()
+        async public Task<List<string>> syncKeys()
         {
-
-            logger.info("fetching list of S3 keys...");
+            List<string> keys = new();
             ListObjectsV2Response response;
             var request = new ListObjectsV2Request { BucketName = bucket };
             do
             {
                 response = await client.ListObjectsV2Async(request);
-                logger.debug($"received {response.KeyCount} keys");
                 foreach (var s3Obj in response.S3Objects)
                     keys.Add(s3Obj.Key);
                 request.ContinuationToken = response.NextContinuationToken;
             } while (response.IsTruncated);
-            logger.info($"{keys.Count} keys found");
+            return keys;
         }
 
-        async public void syncFiles()
+        async public Task<bool> syncKey(string key)
         {
-            keys.Sort();
-            keys.Reverse();
-            foreach (var k in keys)
-            {
-                string pathnameJson = Path.Join(cacheDir, k + ".json");
-                string pathnameJsonGz = pathnameJson + ".gz";
-                if (File.Exists(pathnameJsonGz))
-                {
-                    logger.debug($"already sync'd: {pathnameJsonGz}");
-                    continue;
-                }
+            string pathnameJson = Path.Join(cacheDir, key + ".json");
+            string pathnameJsonGz = pathnameJson + ".gz";
+            if (File.Exists(pathnameJsonGz))
+                return false;
 
-                logger.debug($"downloading ${k}");
-                var request = new GetObjectRequest() { BucketName = bucket, Key = k };
-                var response = await client.GetObjectAsync(request);
+            logger.info($"downloading {key}");
+            var request = new GetObjectRequest() { BucketName = bucket, Key = key };
+            var response = await client.GetObjectAsync(request);
 
-                logger.debug($"saving ${pathnameJsonGz}");
-                using (FileStream writer = File.OpenWrite(pathnameJsonGz))
-                using (GZipStream zip = new GZipStream(writer, CompressionMode.Compress))
-                using (StreamWriter zipper = new StreamWriter(zip))
-                    zipper.Write(response.ResponseStream);
-            }
+            using (FileStream writer = File.OpenWrite(pathnameJsonGz))
+            using (GZipStream zip = new GZipStream(writer, CompressionMode.Compress))
+            using (StreamWriter zipper = new StreamWriter(zip))
+                response.ResponseStream.CopyTo(zip);
+
+            await Task.Delay(2000); 
+
+            return true;
         }
     }
 }

@@ -127,8 +127,8 @@ namespace JSONExtractor
             if (k.s3CacheDir is not null)
             {
                 s3CacheDir = k.s3CacheDir;
-                toolTip1.SetToolTip(buttonS3CacheDir, s3CacheDir);
                 folderBrowserDialogInputDir.SelectedPath = s3CacheDir;
+                toolTip1.SetToolTip(buttonS3CacheDir, s3CacheDir);
             }
             else if (k.inputDir is not null)
             {
@@ -913,10 +913,12 @@ namespace JSONExtractor
                 return;
 
             s3CacheDir = folderBrowserDialogInputDir.SelectedPath;
+            toolTip1.SetToolTip(buttonS3CacheDir, s3CacheDir);
             Properties.Settings.Default.s3CacheDir = s3CacheDir;
             saveSettings();
         }
 
+        /// <todo>add "time remaining" indicator</todo>
         private async void buttonS3StartSync_Click(object sender, EventArgs e)
         {
             if (s3CacheDir is null)
@@ -926,16 +928,24 @@ namespace JSONExtractor
             }
             buttonS3StartSync.Enabled = false;
 
-            var cloud = new Cloud() 
-            { 
-                accessKey = textBoxS3AccessKey.Text, 
-                secretKey = textBoxS3SecretKey.Text, 
-                bucket = textBoxS3Bucket.Text,
-                cacheDir = s3CacheDir
-            };
-            await Task.Run(() => cloud.syncKeys());
-            await Task.Run(() => cloud.syncFiles());
+            var cloud = new Cloud(accessKey: textBoxS3AccessKey.Text, secretKey: textBoxS3SecretKey.Text, bucket: textBoxS3Bucket.Text, cacheDir: s3CacheDir);
 
+            logger.info("downloading keys");
+            List<string> keys = await cloud.syncKeys();
+            logger.info($"received {keys.Count} keys");
+
+            progressBarStatus.Maximum = keys.Count;
+            keys.Sort();
+
+            logger.info("syncing files");
+            for (int i = 0; i < keys.Count; i++)
+            {
+                _ = await cloud.syncKey(keys[i]);
+                progressBarStatus.Value = i;
+            }
+
+            logger.info("sync complete");
+            progressBarStatus.Value = 0;
             buttonS3StartSync.Enabled = true;
         }
 
