@@ -5,4 +5,9 @@
 
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "annoying", Scope = "member", Target = "~M:JSONExtractor.Util.joinAny(System.String,System.Collections.Generic.IEnumerable{System.Object})~System.String")]
+[assembly: SuppressMessage(
+    "Style", 
+    "IDE1006:Naming Styles", 
+    Justification = "annoying", 
+    Scope = "member", 
+    Target = "~M:JSONExtractor.Util.joinAny(System.String,System.Collections.Generic.IEnumerable{System.Object})~System.String")]

@@ -8,6 +8,13 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Drawing;
+using System.Threading.Tasks;
+
+using Amazon.Auth;
+using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
+using Amazon.S3;
+using Amazon.S3.Model;
 
 namespace JSONExtractor
 {
@@ -40,8 +47,8 @@ namespace JSONExtractor
         List<double> recentCompletionTimesSec = new List<double>();
         const int COMPLETION_TIMES_WINDOW = 100;
 
-        TreeNode collatePivotNode = null;
-        List<string> collatePath = null;
+        TreeNode collect2DPivotNode = null;
+        List<string> collect2DRelativePath = null;
 
         Logger logger = Logger.getInstance();
 
@@ -63,7 +70,7 @@ namespace JSONExtractor
             dataGridViewAttributes.DataSource = extractAttributes;
             dataGridViewFilters.DataSource = filterAttributes;
 
-            comboBoxExtractAttributeAggregateType.SelectedIndex = 0;
+            comboBoxCollect1D.SelectedIndex = 0;
             comboBoxFilterType.SelectedIndex = 0;
 
             clearFileCounts();
@@ -71,10 +78,13 @@ namespace JSONExtractor
             initFromSettings();
 
             updateInterpolationControls();
+            updateCollect2D(null);
 
             backgroundWorkerExtraction.DoWork += BackgroundWorkerExtraction_DoWork;
             backgroundWorkerExtraction.ProgressChanged += BackgroundWorkerExtraction_ProgressChanged;
             backgroundWorkerExtraction.RunWorkerCompleted += BackgroundWorkerExtraction_RunWorkerCompleted;
+
+            logger.initializationComplete = true;
         }
 
         // Balance GUI (Visual Studio keeps resizing things?).
@@ -294,16 +304,16 @@ namespace JSONExtractor
 
             if (tvn.Text.EndsWith("[]"))
             {
-                // this is a List attribute, so let (make) them pick an
-                // aggregation method
-                comboBoxExtractAttributeAggregateType.SelectedIndex = 0;
-                comboBoxExtractAttributeAggregateType.Enabled = true;
+                // this is a List attribute, so let (make) them pick a Collect1D
+                // method
+                comboBoxCollect1D.SelectedIndex = 0;
+                comboBoxCollect1D.Enabled = true;
             }
             else
             {
-                // deselect aggregation
-                comboBoxExtractAttributeAggregateType.SelectedIndex = -1;
-                comboBoxExtractAttributeAggregateType.Enabled = false;
+                // deselect 1D collection
+                comboBoxCollect1D.SelectedIndex = -1;
+                comboBoxCollect1D.Enabled = false;
             }
 
             var label = tvn.Text;
@@ -313,7 +323,7 @@ namespace JSONExtractor
             textBoxExtractAttributeDefault.Text = "";
 
             updateInterpolationControls();
-            updateCollationControls(tvn);
+            updateCollect2D(tvn);
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -407,19 +417,24 @@ namespace JSONExtractor
                 ea.wavecalGenerator = new SpectrumUtil.WavecalGenerator(interpolationCoefficientsJSONPath, interpolationExcitationJSONPath);
             }
 
-            // if collation is enabled, store the path to the pivot node, and the relative path to THIS attribute
-            if (checkBoxCollate.Checked)
+            // if 2D collection is selected, store the path to the pivot node, and the relative path to THIS attribute
+            if (comboBoxCollect2D.SelectedIndex > 0)
             {
-                ea.collatePivotPath = collatePivotNode.FullPath;
-                ea.collatePath = collatePath;
-                ea.collateType = (ExtractAttribute.CollateType)Enum.Parse(
-                    typeof(ExtractAttribute.CollateType), comboBoxCollateType.Text);
+                ea.collect2DPivotPath = collect2DPivotNode.FullPath;
+                ea.collect2DRelativePath = collect2DRelativePath;
+                ea.collect2D = (ExtractAttribute.Collect2D)Enum.Parse(
+                    typeof(ExtractAttribute.Collect2D), comboBoxCollect2D.Text);
             }
 
             logger.debug($"adding {ea}");
             extractAttributes.Add(ea);
             extractBindingSource.ResetBindings(false);
             updateStartability();
+        }
+
+        void enableCollect2D(bool flag)
+        {
+
         }
 
         /// <summary>
@@ -433,7 +448,7 @@ namespace JSONExtractor
             if (interpolationCoefficientsJSONPath is null)
             {
                 var ea = generateExtractAttributeFromSelectedJSONNode();
-                if (ea.aggregateType is null)
+                if (ea.collect1D is null)
                 {
                     logger.error("Coefficients must be an array type");
                     return;
@@ -551,9 +566,9 @@ namespace JSONExtractor
             };
 
             if (tvn.Text.EndsWith("[]"))
-                ea.aggregateType = (ExtractAttribute.AggregateType)Enum.Parse(
-                    typeof(ExtractAttribute.AggregateType),
-                    comboBoxExtractAttributeAggregateType.Text);
+                ea.collect1D = (ExtractAttribute.Collect1D)Enum.Parse(
+                    typeof(ExtractAttribute.Collect1D),
+                    comboBoxCollect1D.Text);
 
             return ea;
         }
@@ -583,60 +598,51 @@ namespace JSONExtractor
             extractAttributes.Insert(row + 1, ea);
         }
 
-        private void checkBoxCollate_CheckedChanged(object sender, EventArgs e) { }
-
-        void updateCollationControls(TreeNode tvn)
+        // is 2D collection possible from the selected attribute?
+        void updateCollect2D(TreeNode tvn)
         {
-            collatePivotNode = null;
-            collatePath = null;
-            bool collatePossible = false;
-
-            if (tvn.Text.EndsWith("[]")) // for now, just support arrays
+            if (tvn != null && tvn.Parent != null && tvn.Text.EndsWith("[]")) 
             {
                 List<string> pathTok = tvn.FullPath.Split('\\').ToList();
                 List<object> l = (List<object>)Util.getJsonValue(treeRoot, tvn.FullPath);
-
-                CollateSignature sigNode = new() 
+                Collect2DSignature sigNode = new() 
                 { 
-                    type    = l.GetType(), 
-                    subtype = l[0].GetType(), 
-                    count   = l.Count, 
-                    name    = pathTok.Last() 
+                    name    = pathTok.Last(),   // e.g. 'processed[]'
+                    count   = l.Count,          // e.g. 2048
+                    type    = l.GetType(),      // e.g. List<double>
+                    subtype = l[0].GetType(),   // e.g. double
                 };
-                List<CollateSignature> sigList = new() { sigNode };
+                List<Collect2DSignature> sigList = new() { sigNode };
 
-                var parent = tvn.Parent;
-                if (parent.Parent != null)
-                { 
-                    Tuple<TreeNode, List<string>> retval = findPivot(parent.Parent, sigList);
-                    if (retval != null)
-                    {
-                        collatePossible = true;
-                        collatePivotNode = retval.Item1;
-                        collatePath = retval.Item2;
-                    }
+                Tuple<TreeNode, List<string>> retval = findPivot(tvn.Parent.Parent, sigList);
+                if (retval != null)
+                {
+                    // 2D collection is possible
+
+                    collect2DPivotNode = retval.Item1;
+                    collect2DRelativePath = retval.Item2;
+
+                    var hint = collect2DPivotNode + " -> " + Util.joinAny(collect2DRelativePath);
+                    logger.debug($"collect2D possible for {tvn.Text} ({hint})");
+                    comboBoxCollect2D.Enabled = true;
+                    toolTip1.SetToolTip(comboBoxCollect2D, hint);
+                    labelCollect2D.ForeColor = SystemColors.ControlText;
+                    return;
                 }
             }
 
-            if (collatePossible)
-            {
-                var hint = collatePivotNode + " -> " + Util.joinAny(collatePath);
-                logger.debug($"collation possible for {tvn.Text} ({hint})");
-                checkBoxCollate.Enabled =
-                comboBoxCollateType.Enabled = true;
-                comboBoxCollateType.SelectedIndex = 0;
-                toolTip1.SetToolTip(checkBoxCollate, hint);
-            }
-            else
-            {
-                checkBoxCollate.Enabled =
-                comboBoxCollateType.Enabled = false;
-                comboBoxCollateType.SelectedIndex = -1;
-                toolTip1.SetToolTip(checkBoxCollate, null);
-            }
+            // collect2D not possible
+            var msg = "Collect2D is not possible for the selected attribute.";
+            collect2DPivotNode = null;
+            collect2DRelativePath = null;
+            comboBoxCollect2D.Enabled = false;
+            comboBoxCollect2D.SelectedIndex = 0;
+            toolTip1.SetToolTip(comboBoxCollect2D, msg);
+            labelCollect2D.ForeColor = SystemColors.GrayText;
+            logger.debug(msg);
         }
 
-        bool nodeContainsPath(TreeNode tvn, List<CollateSignature> sigList)
+        bool nodeContainsPath(TreeNode tvn, List<Collect2DSignature> sigList)
         {
             var topSig = sigList.First();
             var topName = topSig.name;
@@ -669,7 +675,7 @@ namespace JSONExtractor
             return false;
         }
 
-        Tuple<TreeNode, List<string>> findPivot(TreeNode node, List<CollateSignature> sigList)
+        Tuple<TreeNode, List<string>> findPivot(TreeNode node, List<Collect2DSignature> sigList)
         {
             if (node is null)
                 return null; 
@@ -696,7 +702,7 @@ namespace JSONExtractor
                 return null;
 
             var parent = node.Parent;
-            var parentSig = new CollateSignature() { type = parent.GetType(), name = parent.Text };
+            var parentSig = new Collect2DSignature() { type = parent.GetType(), name = parent.Text };
             return findPivot(parent, sigList.Prepend(parentSig).ToList());
         }
 
@@ -911,9 +917,26 @@ namespace JSONExtractor
             saveSettings();
         }
 
-        private void buttonS3StartSync_Click(object sender, EventArgs e)
+        private async void buttonS3StartSync_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("S3 Sync not yet implemented");
+            if (s3CacheDir is null)
+            {
+                logger.error("must select S3 cache folder first");
+                return;
+            }
+            buttonS3StartSync.Enabled = false;
+
+            var cloud = new Cloud() 
+            { 
+                accessKey = textBoxS3AccessKey.Text, 
+                secretKey = textBoxS3SecretKey.Text, 
+                bucket = textBoxS3Bucket.Text,
+                cacheDir = s3CacheDir
+            };
+            await Task.Run(() => cloud.syncKeys());
+            await Task.Run(() => cloud.syncFiles());
+
+            buttonS3StartSync.Enabled = true;
         }
 
         private void textBoxS3Bucket_TextChanged(object sender, EventArgs e)
@@ -1122,7 +1145,6 @@ namespace JSONExtractor
                 if (ea.isTable())
                 {
                     outfile.WriteLine();
-                    outfile.WriteLine($"[{ea.jsonFullPath}]");
                     outfile.WriteLine(ea.formatTable());
                 }
             }
@@ -1156,7 +1178,7 @@ namespace JSONExtractor
             }
         }
 
-        class CollateSignature
+        class Collect2DSignature 
         {
             public Type type;
             public Type subtype;

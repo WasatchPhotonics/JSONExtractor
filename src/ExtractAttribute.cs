@@ -30,33 +30,42 @@ namespace JSONExtractor
         /// mapped to a single dict key) can be aggregated in extracts using any
         /// of the following functions.  Most are intuitive, but for the rest:
         /// 
-        /// - CommaDelimited : output the array as a comma-delimited string ("1,2,3")
-        /// - CommaDelimited : output the array as a pipe-delimited string ("1|2|3")
-        /// - TableRows : append to end of output as an independent row-ordered table (foo, 1, 2, 3)
         /// - TableCols : append to end of output as an independent column-ordered table
+        /// - TableRows : append to end of output as an independent row-ordered table (foo, 1, 2, 3)
+        /// - PipeDelimited : output the array as a pipe-delimited string ("1|2|3")
+        /// - CommaDelimited : output the array as a comma-delimited string ("1,2,3") (essentially extend record's CSV row)
         ///
         /// It is important to recognize that these aggregations are performed on 
-        /// the contents OF ONE LIST: for multi-list rollups, see RollupType.
+        /// the contents OF ONE LIST: for multi-list rollups, see Collect2D.
+        ///
+        /// Aggregation can be combined with interpolation, and if you plan to 
+        /// plot multiple records on the same graph (a common use-case for 
+        /// TableCols and TableRows), probably should be.
+        ///
+        /// 1D aggregation can be combined with 2D aggregation.  In that case, 
+        /// 2D collection is performed *first*, merging data across JSON 
+        /// attributes, then 1D aggregation is performed *after*, across the 
+        /// newly merged 1D array.
         /// </remarks>
-        public enum AggregateType { TableCols, TableRows, Count, Sum, Mean, Median, StdDev, Min, Max, PipeDelimited, CommaDelimited };
+        public enum Collect1D { TableCols, TableRows, Count, Sum, Mean, Median, Stdev, Min, Max, PipeDelimited, CommaDelimited, None };
 
         /// <summary>
-        /// Allows collating multiple lists (2D input data) together into a new 
+        /// Allows aggregating multiple lists (2D input data) together into a new 
         /// 1D virtual list (which may itself be then aggregated using 
-        /// AggregateType).
+        /// Collect1D).
         /// </summary>
-        public enum CollateType { Mean, Median, StdDev };
+        public enum Collect2D { Mean, Median, Stdev, Collate, None };
 
         // public Properties are auto-populated to the bound DataGridView in definition order
         public string label { get; set; }
         public int precision { get; set; }
         public string defaultValue { get; set; }
-        public AggregateType? aggregateType { get; set; } = null;
-        public CollateType? collateType { get; set; } = null;
+        public Collect1D? collect1D { get; set; } = null;
+        public Collect2D? collect2D{ get; set; } = null;
         public string jsonFullPath { get; set; }
 
-        public string collatePivotPath { get; set; }
-        public List<string> collatePath;
+        public string collect2DPivotPath { get; set; }
+        public List<string> collect2DRelativePath;
 
         // used for TableCols/Rows AggregateTypes
         List<List<double>> tableData = new List<List<double>>();
@@ -71,13 +80,13 @@ namespace JSONExtractor
 
         public override string ToString()
         {
-            return $"ExtractAttribute({label} ({jsonFullPath}), default {defaultValue}, aggregateType {aggregateType})";
+            return $"ExtractAttribute({label} ({jsonFullPath}), collect1D {collect1D}, collect2D {collect2D})";
         }
 
         public bool isTable()
         {
-            return aggregateType == AggregateType.TableCols ||
-                   aggregateType == AggregateType.TableRows;
+            return collect1D == Collect1D.TableCols ||
+                   collect1D == Collect1D.TableRows;
         }
 
         public string formatValue(object obj)
@@ -110,43 +119,36 @@ namespace JSONExtractor
 
         string formatAggregate(object obj)
         {
-            if (aggregateType is null)
+            if (collect1D is null)
                 return null;
 
-            if (aggregateType == AggregateType.TableCols || aggregateType == AggregateType.TableRows)
+            if (collect1D == Collect1D.TableCols || collect1D == Collect1D.TableRows)
             {
-                logger.error($"use storeTable() for {aggregateType}");
+                logger.error($"use storeTable() for {collect1D}");
                 return null;
             }
 
             var l = (List<object>)obj;
 
-            if (aggregateType == AggregateType.Count)
+            if (collect1D == Collect1D.Count)
                 return l.Count.ToString();
 
             List<double> values = l.Cast<double>().ToList();
             if (values.Count == 0)
                 return formatDouble(0);
 
-            if (aggregateType == AggregateType.CommaDelimited)
-                return join(",", values);
-            else if (aggregateType == AggregateType.PipeDelimited)
-                return join("|", values);
-
             double result = 0;
-            if (aggregateType == AggregateType.Sum)
-                result = values.Sum();
-            else if (aggregateType == AggregateType.Mean)
-                result = values.Average();
-            else if (aggregateType == AggregateType.Min)
-                result = values.Min();
-            else if (aggregateType == AggregateType.Max)
-                result = values.Max();
-            else if (aggregateType == AggregateType.StdDev)
-                result = Util.stdev(values);
-            else if (aggregateType == AggregateType.Median)
-                result = Util.median(values);
-
+            switch (collect1D)
+            {
+                case Collect1D.Min: result = values.Min(); break;
+                case Collect1D.Max: result = values.Max(); break;
+                case Collect1D.Sum: result = values.Sum(); break;
+                case Collect1D.Mean: result = values.Average(); break;
+                case Collect1D.Stdev: result = Util.stdev(values); break;
+                case Collect1D.Median: result = Util.median(values); break;
+                case Collect1D.PipeDelimited: return join("|", values); 
+                case Collect1D.CommaDelimited: return join(",", values);
+            }
             return formatDouble(result);
         }
 
@@ -168,6 +170,14 @@ namespace JSONExtractor
         /// <param name="jsonRoot">The root of the entire deserialized record being processed. If we're interpolating, we need this so we can extract the wavecal coeffs and excitation.</param>
         public void storeTable(object obj, string recordKey, IDictionary<string, object> jsonRoot)
         {
+            if (doingCollation())
+                storeTableCollate(obj, recordKey, jsonRoot);
+            else
+                storeTable1D(obj, recordKey, jsonRoot);
+        }
+
+        void storeTable1D(object obj, string recordKey, IDictionary<string, object> jsonRoot)
+        {
             if (obj is null)
                 return;
 
@@ -176,10 +186,10 @@ namespace JSONExtractor
                 return;
 
             List<double> values;
-            if (collateType is null)
+            if (!doingCollect2D())
                 values = l.Cast<double>().ToList();
             else
-                values = collateValues(jsonRoot);
+                values = aggregate2D(jsonRoot);
 
             if (interpolatedAxis != null)
             {
@@ -188,33 +198,86 @@ namespace JSONExtractor
                 values = interp.interpolate(interpolatedAxis.newX);
             }
 
-            tableData.Add(values);
             tableKeys.Add(recordKey);
+            tableData.Add(values);
             if (tableDimension < values.Count)
                 tableDimension = values.Count;
         }
 
-        List<double> collateValues(IDictionary<string, object> jsonRoot)
+        /// <summary>
+        /// This function merges storeTable1D() and aggregate2D(), used for the 
+        /// special case of collating (expanding) multiple arrays when 
+        /// Collect2D.Collate is specified.
+        /// </summary>
+        void storeTableCollate(object obj, string recordKey, IDictionary<string, object> jsonRoot)
         {
-            var pivotObj = Util.getJsonValue(jsonRoot, collatePivotPath);
+            if (obj is null)
+                return;
+
+            var pivotObj = Util.getJsonValue(jsonRoot, collect2DPivotPath);
             IDictionary<string, object> pivotNode = (IDictionary<string, object>)pivotObj;
 
-            List<List<double>> data = new();
-
-            // iterate over the top-level keys of the pivot, loading 
-            // each target array into a new 2D matrix
+            // iterate over the top-level keys of the pivot, collating
+            // each into the output table
             foreach (var pair in pivotNode)
             {
-                // append the configured collation path
-                var thisPath = collatePivotPath + "\\" + pair.Key + "\\" + Util.joinAny(collatePath, "\\");
-
-                logger.debug($"trying to collate {thisPath}");
+                var thisPath = collect2DPivotPath + "\\" + pair.Key + "\\" + Util.joinAny(collect2DRelativePath, "\\");
+                logger.debug($"collating {thisPath}");
 
                 var thisObj = Util.getJsonValue(jsonRoot, thisPath);
                 var l = (List<object>)thisObj;
                 if (l.Count == 0)
                 {
-                    logger.error($"found empty array at {thisPath} during collating");
+                    logger.error($"found empty array at {thisPath} during collation");
+                    continue;
+                }
+
+                List<double> values = l.Cast<double>().ToList();
+
+                if (interpolatedAxis != null)
+                {
+                    List<double> oldX = wavecalGenerator.generateAxis(jsonRoot, values.Count);
+                    Interpolator interp = new Interpolator(oldX, values);
+                    values = interp.interpolate(interpolatedAxis.newX);
+                }
+
+                tableKeys.Add(recordKey + '\\' + pair.Key);
+                tableData.Add(values);
+                if (tableDimension < values.Count)
+                    tableDimension = values.Count;
+            }
+        }
+
+        /// <summary>
+        /// In the course of performing an extract, we are processing an array 
+        /// attribute which has Collect2D enabled (other than Collate).  Go and 
+        /// collect all the attributes which can be collected into this one, and
+        /// merge them into a single list.
+        /// </summary>
+        /// <warning>not for use with Collect2D.Collate</warning>
+        /// <param name="jsonRoot"></param>
+        /// <returns>a 1D array of values collected from multiple attributes</returns>
+        List<double> aggregate2D(IDictionary<string, object> jsonRoot)
+        {
+            var pivotObj = Util.getJsonValue(jsonRoot, collect2DPivotPath);
+            IDictionary<string, object> pivotNode = (IDictionary<string, object>)pivotObj;
+
+            List<List<double>> data = new(); // hold the 2D data we'll be collecting and then reducing
+
+            // iterate over the top-level keys of the pivot, loading 
+            // each target array into a new 2D matrix
+            foreach (var pair in pivotNode)
+            {
+                // append the configured relative path
+                var thisPath = collect2DPivotPath + "\\" + pair.Key + "\\" + Util.joinAny(collect2DRelativePath, "\\");
+
+                logger.debug($"generating Collect2D<{collect2D}> {thisPath}");
+
+                var thisObj = Util.getJsonValue(jsonRoot, thisPath);
+                var l = (List<object>)thisObj;
+                if (l.Count == 0)
+                {
+                    logger.error($"found empty array at {thisPath} during aggregate2D");
                     continue;
                 }
 
@@ -226,14 +289,38 @@ namespace JSONExtractor
                     data[i].Add(values[i]);
             }
 
-            if (collateType == CollateType.Mean)
-                return Util.collateMean(data);
-            else if (collateType == CollateType.Median)
-                return Util.collateMedian(data);
-            else if (collateType == CollateType.StdDev)
-                return Util.collateStdev(data);
-            else
-                return null;
+            switch (collect2D)
+            {
+                case Collect2D.Mean: return Util.mean2D(data);
+                case Collect2D.Stdev: return Util.stdev2D(data);
+                case Collect2D.Median: return Util.median2D(data);
+                case Collect2D.Collate:
+                default:
+                    logger.error($"should not use {collect2D} with aggregate2D");
+                    break;
+            }
+            return null;
+        }
+
+        bool doingCollect1D() => collect1D != null && collect1D != Collect1D.None;
+        bool doingCollect2D() => collect2D != null && collect2D != Collect2D.None;
+        bool doingCollation() => collect2D != null && collect2D == Collect2D.Collate;
+
+        string getTableName()
+        {
+            // from: root\AxisStabilityTest\Measurements\Measurement 2\processed[]
+            //   to: AxisStabilityTest\Measurements\Mean\processed[]
+            string name = jsonFullPath;
+            if (name.StartsWith("root\\"))
+                name = name.Substring(5);
+            if (doingCollect2D())
+            {
+                var tok = name.Split('\\');
+                var cnt = tok.Length;
+                tok[cnt - 2] = collect2D.ToString();
+                name = string.Join('\\', tok);
+            }
+            return name;
         }
 
         /// <summary>
@@ -241,15 +328,15 @@ namespace JSONExtractor
         /// </summary>
         public string formatTable()
         {
-            string table = null;
-            if (aggregateType == AggregateType.TableRows)
+            string table = "";
+            if (collect1D == Collect1D.TableRows)
             {
                 if (interpolatedAxis is null)
                     table = renderTableRowOrderUninterpolated();
                 else
                     table = renderTableRowOrderInterpolated();
             }
-            else if (aggregateType == AggregateType.TableCols)
+            else if (collect1D == Collect1D.TableCols)
             {
                 if (interpolatedAxis is null)
                     table = renderTableColumnOrderUninterpolated();
@@ -257,13 +344,13 @@ namespace JSONExtractor
                     table = renderTableColumnOrderInterpolated();
             }
             else
-                logger.error($"unsupported table type: {aggregateType}");
+                logger.error($"unsupported table type: {collect1D}");
 
             tableData.Clear();
             tableKeys.Clear();
             tableDimension = 0;
 
-            return table;
+            return getTableName() + Environment.NewLine + table;
         }
 
         string renderTableColumnOrderInterpolated()
@@ -350,7 +437,8 @@ namespace JSONExtractor
             public string label { get; set; }
             public int precision { get; set; }
             public string defaultValue { get; set; }
-            public string aggregateType { get; set; }
+            public string collect1D { get; set; }
+            public string collect2D { get; set; }
             public string jsonFullPath { get; set; }
             public string wavecalJsonPath { get; set; }
             public string excitationJsonPath { get; set; }
@@ -363,7 +451,8 @@ namespace JSONExtractor
                     label = ea.label,
                     precision = ea.precision,
                     defaultValue = ea.defaultValue,
-                    aggregateType = ea.aggregateType.ToString(),
+                    collect1D = ea.collect1D.ToString(),
+                    collect2D = ea.collect2D.ToString(),
                     jsonFullPath = ea.jsonFullPath,
                     wavecalJsonPath = ea.wavecalGenerator is null ? null : ea.wavecalGenerator.wavecalJsonPath,
                     excitationJsonPath = ea.wavecalGenerator is null ? null : ea.wavecalGenerator.excitationJsonPath,
@@ -374,16 +463,20 @@ namespace JSONExtractor
 
             public ExtractAttribute deserialize()
             {
-                AggregateType aggregateTypeEnum = AggregateType.Count;
-                Enum.TryParse(aggregateType, out aggregateTypeEnum);
+                Collect1D collect1D_tmp = Collect1D.None;
+                Enum.TryParse(collect1D, out collect1D_tmp);
+
+                Collect2D collect2D_tmp = Collect2D.None;
+                Enum.TryParse(collect1D, out collect2D_tmp);
 
                 ExtractAttribute ea = new()
                 {
-                    aggregateType = aggregateTypeEnum,
                     label = label,
                     precision = precision,
                     defaultValue = defaultValue,
                     jsonFullPath = jsonFullPath,
+                    collect1D = collect1D_tmp == Collect1D.None ? null : collect1D_tmp,
+                    collect2D = (collect2D_tmp == Collect2D.None || collect2D_tmp == Collect2D.None) ? null : collect2D_tmp,
                     wavecalGenerator = new(wavecalJsonPath, excitationJsonPath),
                     interpolatedAxis = new(newX)
                 };

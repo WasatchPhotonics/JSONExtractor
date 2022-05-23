@@ -83,6 +83,18 @@ namespace JSONExtractor
             return result;
         }
 
+        ////////////////////////////////////////////////////////////////////////
+        // Math helpers
+        ////////////////////////////////////////////////////////////////////////
+
+        public static List<double> mean2D(List<List<double>> data)
+        {
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(data[i].Average());
+            return result;
+        }
+
         /// <see href="https://stackoverflow.com/a/897463/11615696"/>
         public static double stdev(IEnumerable<double> values)
         {
@@ -99,11 +111,27 @@ namespace JSONExtractor
             return Math.Sqrt(S / (k - 2));
         }
 
+        public static List<double> stdev2D(List<List<double>> data)
+        {
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(stdev(data[i]));
+            return result;
+        }
+
         public static double median(IEnumerable<double> values)
         {
             List<double> s = new(values);
             s.Sort();
             return (s.Count % 2 == 1) ? s[s.Count / 2] : (s[s.Count / 2 - 1] + s[s.Count / 2]) / 2.0;
+        }
+
+        public static List<double> median2D(List<List<double>> data)
+        {
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(median(data[i]));
+            return result;
         }
 
         public static string timeRemainingLabel(double totalSec)
@@ -168,28 +196,5 @@ namespace JSONExtractor
             return string.Join(delim, things.Select(thing => thing.ToString()).ToArray());
         }
 
-        public static List<double> collateMean(List<List<double>> data)
-        {
-            List<double> result = new();
-            for (int i = 0; i < data.Count; i++)
-                result.Add(data[i].Average());
-            return result;
-        }
-
-        public static List<double> collateStdev(List<List<double>> data)
-        {
-            List<double> result = new();
-            for (int i = 0; i < data.Count; i++)
-                result.Add(stdev(data[i]));
-            return result;
-        }
-
-        public static List<double> collateMedian(List<List<double>> data)
-        {
-            List<double> result = new();
-            for (int i = 0; i < data.Count; i++)
-                result.Add(median(data[i]));
-            return result;
-        }
     }
 }

@@ -40,11 +40,6 @@ So now there is one :-)
 - test this instead of Interpolator
     - https://numerics.mathdotnet.com/api/MathNet.Numerics.Interpolation/StepInterpolation.htm
     - https://gist.github.com/AdnanCutura/478c27879d660b9150c0048eba823e81?permalink_comment_id=4163414#gistcomment-4163414
-- add element-wise rollup 
-    - "Measurement 10"/processed[] -> AxisStabilityTest/Measurements
-    - element-wise rollup supports Mean, Median, Stdev
-    - rollup ITSELF still supports all AggregateTypes, including Sum, TableCols etc
-- implement AWS S3 sync
 - before/after comparator for dates
 
 # Architecture

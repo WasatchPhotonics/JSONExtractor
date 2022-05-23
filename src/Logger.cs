@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 
 namespace JSONExtractor
 {
-    public class Logger 
+    public class Logger
     {
         public enum LogLevel { DEBUG, INFO, ERROR, NEVER };
 
@@ -25,6 +25,7 @@ namespace JSONExtractor
 
         TextBox textBox = null;
         StreamWriter outfile;
+        public bool initializationComplete;
 
         ////////////////////////////////////////////////////////////////////////
         // Public attributes
@@ -280,7 +281,7 @@ namespace JSONExtractor
                     outfile.Flush();
                 }
 
-                if (textBox != null)
+                if (textBox != null && initializationComplete)
                     textBox.BeginInvoke(new MethodInvoker(delegate { if (textBox != null) textBox.AppendText(msg + Environment.NewLine); }));
             }
         }
