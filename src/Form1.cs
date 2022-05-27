@@ -1,20 +1,13 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
+using System.Windows.Forms.DataVisualization.Charting;
 using Newtonsoft.Json;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Drawing;
-using System.Threading.Tasks;
-
-using Amazon.Auth;
-using Amazon.Runtime;
-using Amazon.Runtime.CredentialManagement;
-using Amazon.S3;
-using Amazon.S3.Model;
 
 namespace JSONExtractor
 {
@@ -39,7 +32,6 @@ namespace JSONExtractor
         int skipCount;          // how many input records matched the filter but had no exportable data
 
         string s3CacheDir;      // where to locally store files downloaded from S3
-        //bool s3SyncRunning;   // is S3 currently syncing
 
         bool extractRunning;    // is an extract currently running
         StreamWriter outfile;   // where extracts are written
@@ -50,10 +42,21 @@ namespace JSONExtractor
         TreeNode collect2DPivotNode = null;
         List<string> collect2DRelativePath = null;
 
+        Cloud cloud;
+
+        Chart previewChart = new Chart();
+        string previewNodePath = "";
+        object previewMut = new object();
+
+        Chart extractChart = new Chart();
+        List<ExtractAttribute> chartAttributes = new();
+
         Logger logger = Logger.getInstance();
 
         ////////////////////////////////////////////////////////////////////////
-        // Lifecycle
+        //                                                                    //
+        //                             Lifecycle                              //
+        //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
         public Form1()
@@ -83,6 +86,15 @@ namespace JSONExtractor
             backgroundWorkerExtraction.DoWork += BackgroundWorkerExtraction_DoWork;
             backgroundWorkerExtraction.ProgressChanged += BackgroundWorkerExtraction_ProgressChanged;
             backgroundWorkerExtraction.RunWorkerCompleted += BackgroundWorkerExtraction_RunWorkerCompleted;
+
+            initPreviewChart();
+            initExtractChart();
+
+            cloud = new Cloud(buttonS3StartSync, progressBarStatus);
+
+            labelSelectedName.Text =
+                labelSelectedType.Text = "";
+            updateExplanation();
 
             logger.initializationComplete = true;
         }
@@ -136,13 +148,78 @@ namespace JSONExtractor
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////
+        //                                                                    //
+        //                              AWS S3                                //
+        //                                                                    //
+        ////////////////////////////////////////////////////////////////////////
+
+        /// <summary>
+        /// The user clicked the button to select a directory to where S3 blobs
+        /// should be sync'd (sunk?), or alternately have already been sync'd
+        /// via awscli.
+        /// </summary>
+        void buttonS3CacheDir_Click(object sender, EventArgs e)
+        {
+            var result = folderBrowserDialogInputDir.ShowDialog();
+            if (result != DialogResult.OK)
+                return;
+
+            s3CacheDir = folderBrowserDialogInputDir.SelectedPath;
+            toolTip1.SetToolTip(buttonS3CacheDir, s3CacheDir);
+            Properties.Settings.Default.s3CacheDir = s3CacheDir;
+            saveSettings();
+        }
+
+        /// <todo>add "time remaining" indicator</todo>
+        void buttonS3StartSync_Click(object sender, EventArgs e)
+        {
+            if (s3CacheDir is null || !Directory.Exists(s3CacheDir))
+            {
+                logger.error("must select S3 cache folder first");
+                return;
+            }
+
+            if (cloud.running)
+            {
+                logger.info("cancelling sync");
+                cloud.stop();
+            }
+            else
+            {
+                logger.info("starting sync");
+                buttonS3StartSync.Text = "Pause Sync";
+                cloud.start(textBoxS3AccessKey.Text, textBoxS3SecretKey.Text, textBoxS3Bucket.Text, s3CacheDir);
+            }
+        }
+
+        void textBoxS3Bucket_TextChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.s3Bucket = textBoxS3Bucket.Text;
+            saveSettings();
+        }
+
+        void textBoxS3AccessKey_TextChanged(object sender, EventArgs e) 
+        {
+            Properties.Settings.Default.s3AccessKey = textBoxS3AccessKey.Text;
+            saveSettings();
+        }
+
+        void textBoxS3SecretKey_TextChanged(object sender, EventArgs e) 
+        {
+            Properties.Settings.Default.s3SecretKey = textBoxS3SecretKey.Text;
+            saveSettings();
+        }
+
         void saveSettings() => Properties.Settings.Default.Save();
 
         ////////////////////////////////////////////////////////////////////////
-        // Saved Configurations
+        //                                                                    //
+        //                         Saved Configurations                       //
+        //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
-        private void buttonSaveConfig_Click(object sender, EventArgs e)
+        void buttonSaveConfig_Click(object sender, EventArgs e)
         {
             DialogResult ok = saveFileDialogConfig.ShowDialog();
             if (ok != DialogResult.OK)
@@ -160,7 +237,7 @@ namespace JSONExtractor
             logger.info($"saved config to {saveFileDialogConfig.FileName}");
         }
 
-        private void buttonLoadConfig_Click(object sender, EventArgs e)
+        void buttonLoadConfig_Click(object sender, EventArgs e)
         {
             DialogResult ok = openFileDialogConfig.ShowDialog();
             if (ok != DialogResult.OK)
@@ -186,7 +263,173 @@ namespace JSONExtractor
         }
 
         ////////////////////////////////////////////////////////////////////////
-        // Sample Template
+        //                                                                    //
+        //                       Select Input Files                           //
+        //                                                                    //
+        ////////////////////////////////////////////////////////////////////////
+
+        void clearFileCounts()
+        {
+            filteredCount = 0;
+            extractedCount = 0;
+            processedCount = 0;
+            skipCount = 0;
+
+            progressBarStatus.Maximum = dedupedPathnames.Count;
+            progressBarStatus.Value = 0;
+
+            updateFileCounts();
+        }
+
+        void updateFileCounts()
+        {
+            labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
+            labelDedupedCount.Text = $"Deduped: {dedupedPathnames.Count}";
+            labelFilteredCount.Text = $"Filtered: {filteredCount}";
+            labelExtractedCount.Text = $"Extracted: {extractedCount}";
+            labelProcessedCount.Text = $"Processed: {processedCount}";
+            labelSkippedCount.Text = $"Skipped: {skipCount}";
+
+            progressBarStatus.Value = processedCount;
+
+            string tt = "unknown time remaining";
+            if (recentCompletionTimesSec.Count > 0)
+            {
+                var secPerRec = recentCompletionTimesSec.Average();
+                var secRemaining = (dedupedPathnames.Count - processedCount) * secPerRec;
+                tt = Util.timeRemainingLabel(secRemaining);
+            }
+            toolTip1.SetToolTip(progressBarStatus, tt);
+        }
+
+        /// <summary>
+        /// The user clicked the button to select an input directory, so let
+        /// them choose the directory and then read-in the list of .json files.
+        /// </summary>
+        /// <todo>create a file iterator...no need to actually keep these names in memory</todo>
+        void buttonSelectInputDir_Click(object sender, EventArgs e)
+        {
+            var result = folderBrowserDialogInputDir.ShowDialog();
+            if (result != DialogResult.OK)
+                return;
+
+            Properties.Settings.Default.inputDir = folderBrowserDialogInputDir.SelectedPath;
+            saveSettings();
+
+            selectedPathnames = new List<string>();
+            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json"));
+            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json.gz"));
+
+            dedupeInputPathnames();
+        }
+
+        /// <summary>
+        /// Rather than select a whole directory, the user clicked the button to manually select one or more input files.
+        /// </summary>
+        void buttonSelectFiles_Click(object sender, EventArgs e)
+        {
+            var result = openFileDialogInputFiles.ShowDialog();
+            if (result != DialogResult.OK)
+                return;
+
+            selectedPathnames = new List<string>();
+            selectedPathnames.AddRange(openFileDialogInputFiles.FileNames);
+
+            dedupeInputPathnames();
+        }
+
+        /// <summary>
+        /// This performs BOTH de-duping of "unique" filename tokens (like serial
+        /// number), to ensure that only the last record of a given token is 
+        /// processed, AND checking the "Within" clause using the same token.
+        /// </summary>
+        void dedupeInputPathnames()
+        {
+            selectedPathnames.Sort();
+            labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
+
+            if (!checkBoxDedupeFilenames.Checked)
+            {
+                dedupedPathnames = selectedPathnames;
+            }
+            else
+            {
+                // parse Within list (on comma if found, else whitespace)
+                HashSet<string> withinSet = new();
+                string withinStr = textBoxDedupeWithin.Text.Trim().ToLower();
+                if (withinStr.Length > 0)
+                {
+                    List<string> tok = new();
+                    if (withinStr.Contains(','))
+                    {
+                        foreach (var s in withinStr.Split(","))
+                            if (s.Trim().Length > 0)
+                                withinSet.Add(s.Trim());
+                    }
+                    else
+                    {
+                        foreach (var s in withinStr.Split())
+                            if (s.Trim().Length > 0)
+                                withinSet.Add(s.Trim());
+                    }
+                }
+
+                // Dedupe on unique token
+                var re = new Regex(textBoxDedupeFilenames.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                Dictionary<string, string> latestUnique = new Dictionary<string, string>();
+                foreach (var pathname in selectedPathnames)
+                {
+                    var basename = Path.GetFileName(pathname).Split(".").First();
+                    var match = re.Match(basename);
+                    if (match.Success && match.Groups.Count > 1)
+                    {
+                        var unique = match.Groups[1].Value;
+
+                        // if we defined a Within list, then first ensure this is
+                        // a valid element
+                        if (withinSet.Count > 0)
+                            if (!withinSet.Contains(unique.ToLower()))
+                                continue;
+                        
+                        latestUnique[unique] = pathname;
+                    }
+                    else
+                    {
+                        if (withinSet.Count == 0)
+                        {
+                            // we didn't match the pattern, so just store the
+                            // pathname directly (do this if we're "just"
+                            // dedupping...if a "Within" list was specified, this
+                            // is a fail)
+                            latestUnique[basename] = pathname;
+                        }
+                    }
+                }
+
+                dedupedPathnames = new();
+                foreach (var pair in latestUnique)
+                    dedupedPathnames.Add(pair.Value);
+                dedupedPathnames.Sort();
+            }
+
+            labelDedupedCount.Text = $"Deduped: {dedupedPathnames.Count}";
+            updateStartability();
+        }
+
+        void checkBoxDedupeFilenames_CheckedChanged(object sender, EventArgs e)
+        {
+            var cb = sender as CheckBox;
+            if (cb.Checked)
+                dedupeInputPathnames();
+            else
+                dedupedPathnames = selectedPathnames;
+            updateStartability();
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        //                                                                    //
+        //                         Load JSON Template                         //
+        //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
@@ -194,7 +437,7 @@ namespace JSONExtractor
         /// file, load and it, then re-populate the "tree view" from its structure.
         /// </summary>
         /// <see cref="https://stackoverflow.com/a/31250524/6436775"/>
-        private void buttonLoadSample_Click(object sender, EventArgs e)
+        void buttonLoadSample_Click(object sender, EventArgs e)
         {
             treeRoot = null;
             treeViewJSON.Nodes.Clear();
@@ -277,7 +520,7 @@ namespace JSONExtractor
         /// <summary>
         /// Automatically add double-clicked tree nodes to the extract.
         /// </summary>
-        private void treeViewJSON_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+        void treeViewJSON_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
         {
             if (e.Node is null)
                 return;
@@ -289,13 +532,17 @@ namespace JSONExtractor
         /// The user has now selected an attribute in the JSON TreeView, so
         /// update the "add filter" and "add extract" regions accordingly.
         /// </summary>
-        private void treeViewJSON_AfterSelect(object sender, TreeViewEventArgs e)
+        void treeViewJSON_AfterSelect(object sender, TreeViewEventArgs e)
         {
+            labelSelectedName.Text = "";
+            labelSelectedType.Text = "";
+
             TreeNode tvn = treeViewJSON.SelectedNode;
             if (tvn is null)
             {
                 buttonAddExtractAttribute.Enabled =
                     buttonFilterAdd.Enabled = false;
+                updateExplanation();
                 return;
             }
 
@@ -317,6 +564,10 @@ namespace JSONExtractor
             }
 
             var label = tvn.Text;
+
+            labelSelectedName.Text = label;
+            labelSelectedType.Text = Util.getJsonType(treeRoot, tvn.FullPath);
+
             if (label.EndsWith("[]"))
                 label = label.Substring(0, label.Length - 2);
             textBoxExtractAttributeLabel.Text = label;
@@ -327,14 +578,87 @@ namespace JSONExtractor
         }
 
         ////////////////////////////////////////////////////////////////////////
-        // Filters
+        //                                                                    //
+        //                           Preview Chart                            //
+        //                                                                    //
+        ////////////////////////////////////////////////////////////////////////
+
+        void initPreviewChart()
+        {
+            this.Controls.Add(previewChart);
+
+            // preview.Width = this.Width / 3;
+            // preview.Height = this.Height / 3;
+            previewChart.BorderlineWidth = 1;
+            previewChart.BorderlineColor = Color.Gray;
+            previewChart.IsSoftShadows = true;
+            previewChart.BringToFront();
+            previewChart.BorderlineDashStyle = ChartDashStyle.Solid;
+
+            ChartArea area = new();
+            area.BorderWidth = 1;
+            area.BorderColor = Color.Gray;
+            area.BorderDashStyle = ChartDashStyle.Solid;
+            area.ShadowOffset = 5;
+            previewChart.ChartAreas.Add(area);
+
+            Series s = new Series();
+            s.ChartType = SeriesChartType.Line;
+            s.Color = Color.Blue;
+            previewChart.Series.Add(s);
+
+            previewChart.Visible = false;
+        }
+
+        void treeViewJSON_NodeMouseHover(object sender, TreeNodeMouseHoverEventArgs e)
+        {
+            var tvn = e.Node;
+            if (!Util.isJsonArrayDouble(treeRoot, tvn.FullPath))
+            {
+                hidePreview();
+                return;
+            }
+
+            lock (previewMut)
+            {
+                if (previewNodePath == tvn.FullPath)
+                    return;
+                previewNodePath = tvn.FullPath;
+            }
+
+            var relPos = PointToClient(MousePosition);
+            previewChart.Location = new Point(x: relPos.X + 150, y: relPos.Y + 50);
+            previewChart.Width = Width / 3;
+            previewChart.Height = Height / 3;
+            previewChart.Visible = true;
+
+            var s = previewChart.Series[0];
+            s.Points.Clear();
+
+            List<double> values = Util.getJsonArray(treeRoot, tvn.FullPath);
+            for (int i = 0; i < values.Count; i++)
+                s.Points.AddXY(i, values[i]);
+        }
+
+        void treeViewJSON_MouseLeave(object sender, EventArgs e) => hidePreview();
+
+        void hidePreview()
+        {
+            previewChart.Visible = false;
+            previewNodePath = "";
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        //                                                                    //
+        //                           Extract Filters                          //
+        //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
         /// The user clicked the button to add the selected JSON TreeView Node
         /// to the list of FilterAttributes.
         /// </summary>
-        private void buttonFilterAdd_Click(object sender, EventArgs e)
+        void buttonFilterAdd_Click(object sender, EventArgs e)
         {
             var tvn = treeViewJSON.SelectedNode; // "tree view node"
             if (tvn is null)
@@ -376,6 +700,97 @@ namespace JSONExtractor
             filterBindingSource.ResetBindings(false);
         }
 
+        ////////////////////////////////////////////////////////////////////////
+        //                                                                    //
+        //                        Extract Attributes                          //
+        //                                                                    //
+        ////////////////////////////////////////////////////////////////////////
+
+        void updateExplanation()
+        {
+            string name = labelSelectedName.Text;
+            string s = "No attribute has been selected.";
+            if (name != "")
+            {
+                s = $"The attribute '{name}', a {labelSelectedType.Text}, will be extracted to the report. ";
+
+                if (!name.EndsWith("[]"))
+                    s += $"Since {name} is a scalar type (not a list or array), no additional aggregation options are available (Collect1D or Collect2D), nor is interpolation possible. Graphing is also currently disabled for scalars. ";
+                else
+                {
+                    s += $"\n\n{name} is an array attribute, so interpolation, graphing and aggregation are possible. ";
+                    if (checkBoxInterpolate.Checked)
+                    {
+                        s += $"Since Interpolate is checked, the values will be interpolated against an x-axis ";
+                        if (interpolationExcitationJSONPath is null)
+                            s += $"in wavelengths (nm) generated from each record's coefficients found in {interpolationCoefficientsJSONPath}. ";
+                        else
+                            s += $"generated from each record's wavelength coefficients found in {interpolationCoefficientsJSONPath} " +
+                                 $"and then converted to Raman shift (wavenumbers in 1/cm) from the excitation wavelength " +
+                                 $"found in the record's {interpolationExcitationJSONPath} attribute. ";
+                    }
+                    else
+                        s += "Because Interpolate is not checked, the values will be graphed against an ordinal x-axis (1, 2, 3, etc), AKA 'pixel space'. ";
+
+                    if (collect2DPivotNode != null)
+                    {
+                        string path = string.Join(" -> ", collect2DRelativePath);
+                        s += $"\n\nSince the path {path} can be found repeated under each key of '{collect2DPivotNode.Text}' (with the same type and dimension), Collect2D aggregation is available. ";
+                        if (comboBoxCollect2D.SelectedIndex > -1)
+                        {
+                            string function = comboBoxCollect2D.Text;
+                            if (function != "Collate")
+                                s += $"As Collect2D has been enabled, each individual value of the '{name}' array under '{collect2DPivotNode.Text}' will be aggregated across attributes using {function}(). ";
+                            else
+                                s += $"As 'Collate' has been selected, each '{name}' array under '{collect2DPivotNode.Text}' will be extracted and added to the resulting table" +
+                                      (checkBoxGraph.Checked ? " (and graph)." : ".");
+                        }
+                        else
+                        {
+                            s += "However, no Collect2D function has been selected, so no 2-dimensional aggregation will be performed. ";
+                        }
+                    }
+
+                    s += "\n\nOne-dimensional aggregation (Collect1D) is available on all numeric array attributes. ";
+                    var noneSelected = "However, as no aggregation function was selected, no aggregation will be performed. ";
+                    if (comboBoxCollect1D.SelectedIndex > -1)
+                    {
+                        string function = comboBoxCollect1D.Text;
+                        if (function != "None")
+                        {
+                            s += $"As {function} was selected, the attribute will be ";
+                            switch (function)
+                            {
+                                case "TableRows": s += "appended as a block of row-ordered, comma-delimited arrays at the bottom of the extract. "; break;
+                                case "TableCols": s += "appended as a block of column-ordered, comma-delimited arrays at the bottom of the extract. "; break;
+                                case "PipeDelimited": s += "collapsed to a single pipe-delimited string (|) and included in the standard extract table. "; break;
+                                case "CommaDelimited": s += "appended to the ongoing extract CSV as a series of comma-delimited vaues. "; break;
+                                default: s += "collapsed into a single scalar value using the {function}() function. "; break;
+                            }
+
+                            if (collect2DPivotNode != null)
+                                s += "It is important to note that Collect2D aggregation will be performed BEFORE Collect1D aggregation. ";
+                        }
+                        else
+                            s += noneSelected;
+                    }
+                    else
+                        s += noneSelected;
+
+                    if (checkBoxGraph.Checked)
+                        s += "\n\nAs Graph is checked, each array will be plotted to a chart in the other tab during extraction. ";
+                    else
+                        s += "\n\nNo graph will be generated for this attribute as that option was not selected. ";
+                }
+            }
+
+            // https://stackoverflow.com/a/3230908/11615696
+            Regex re = new Regex("(.{80} )"); 
+            s = re.Replace(s, "$1\n");
+
+            toolTip1.SetToolTip(labelExtractAttributeExplain, s);
+        }
+
         /// <summary>
         /// Determine whether we have met the necessary preconditions to start an extract.
         /// </summary>
@@ -386,17 +801,15 @@ namespace JSONExtractor
 
             buttonExtractAttributeDown.Enabled =
             buttonExtractAttributeUp.Enabled = haveAttr;
-        }
 
-        ////////////////////////////////////////////////////////////////////////
-        // Extract Attributes
-        ////////////////////////////////////////////////////////////////////////
+            updateExplanation();
+        }
 
         /// <summary>
         /// The user clicked the button to add the selected JSON TreeView Node
         /// to the list of ExtractAttributes.
         /// </summary>
-        private void buttonAttrAdd_Click(object sender, EventArgs e)
+        void buttonAttrAdd_Click(object sender, EventArgs e)
         {
             // this is the actual attribute we're going to extract
             var ea = generateExtractAttributeFromSelectedJSONNode();
@@ -426,15 +839,13 @@ namespace JSONExtractor
                     typeof(ExtractAttribute.Collect2D), comboBoxCollect2D.Text);
             }
 
+            ea.graphRequested = checkBoxGraph.Checked;
+
             logger.debug($"adding {ea}");
             extractAttributes.Add(ea);
+
             extractBindingSource.ResetBindings(false);
             updateStartability();
-        }
-
-        void enableCollect2D(bool flag)
-        {
-
         }
 
         /// <summary>
@@ -443,7 +854,7 @@ namespace JSONExtractor
         /// in interpolating other aggregate data (e.g. spectra) against the
         /// generated x-axis.
         /// </summary>
-        private void buttonUseCoefficients_Click(object sender, EventArgs e)
+        void buttonUseCoefficients_Click(object sender, EventArgs e)
         {
             if (interpolationCoefficientsJSONPath is null)
             {
@@ -518,9 +929,14 @@ namespace JSONExtractor
                 buttonExcitation.Text = "Clear Excitation";
                 toolTip1.SetToolTip(buttonExcitation, "Clearing excitation will cause interpolated x-axis to use wavelength space");
             }
+            updateExplanation();
         }
 
-        private void buttonExcitation_Click(object sender, EventArgs e)
+        void numericUpDownInterpolationStart_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
+        void numericUpDownInterpolationEnd_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
+        void numericUpDownInterpolationIncr_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
+
+        void buttonExcitation_Click(object sender, EventArgs e)
         {
             if (interpolationExcitationJSONPath is null)
             {
@@ -573,12 +989,25 @@ namespace JSONExtractor
             return ea;
         }
 
-        private void dataGridViewAttributes_RowsRemoved(object sender, DataGridViewRowsRemovedEventArgs e)
+        void dataGridViewAttributes_RowsRemoved(object sender, DataGridViewRowsRemovedEventArgs e)
         {
             updateStartability();
         }
 
-        private void buttonExtractAttributeUp_Click(object sender, EventArgs e)
+        void dataGridViewAttributes_SelectionChanged(object sender, EventArgs e)
+        {
+            var rows = dataGridViewAttributes.SelectedRows;
+            if (rows.Count == 0)
+            {
+                logger.debug($"no rows selected");
+            }
+            else
+            {
+                logger.debug($"Attribute rows selected: {rows}");
+            }
+        }
+
+        void buttonExtractAttributeUp_Click(object sender, EventArgs e)
         {
             var row = dataGridViewAttributes.CurrentCell.RowIndex;
             if (row < 1)
@@ -588,7 +1017,7 @@ namespace JSONExtractor
             extractAttributes.Insert(row - 1, ea);
         }
 
-        private void buttonExtractAttributeDown_Click(object sender, EventArgs e)
+        void buttonExtractAttributeDown_Click(object sender, EventArgs e)
         {
             var row = dataGridViewAttributes.CurrentCell.RowIndex;
             if (row + 1 >= extractAttributes.Count)
@@ -601,15 +1030,15 @@ namespace JSONExtractor
         // is 2D collection possible from the selected attribute?
         void updateCollect2D(TreeNode tvn)
         {
-            if (tvn != null && tvn.Parent != null && tvn.Text.EndsWith("[]")) 
+            if (tvn != null && tvn.Parent != null && tvn.Text.EndsWith("[]"))
             {
                 List<string> pathTok = tvn.FullPath.Split('\\').ToList();
                 List<object> l = (List<object>)Util.getJsonValue(treeRoot, tvn.FullPath);
-                Collect2DSignature sigNode = new() 
-                { 
-                    name    = pathTok.Last(),   // e.g. 'processed[]'
-                    count   = l.Count,          // e.g. 2048
-                    type    = l.GetType(),      // e.g. List<double>
+                Collect2DSignature sigNode = new()
+                {
+                    name = pathTok.Last(),   // e.g. 'processed[]'
+                    count = l.Count,          // e.g. 2048
+                    type = l.GetType(),      // e.g. List<double>
                     subtype = l[0].GetType(),   // e.g. double
                 };
                 List<Collect2DSignature> sigList = new() { sigNode };
@@ -627,6 +1056,8 @@ namespace JSONExtractor
                     comboBoxCollect2D.Enabled = true;
                     toolTip1.SetToolTip(comboBoxCollect2D, hint);
                     labelCollect2D.ForeColor = SystemColors.ControlText;
+
+                    updateExplanation();
                     return;
                 }
             }
@@ -640,7 +1071,13 @@ namespace JSONExtractor
             toolTip1.SetToolTip(comboBoxCollect2D, msg);
             labelCollect2D.ForeColor = SystemColors.GrayText;
             logger.debug(msg);
+
+            updateExplanation();
         }
+
+        ////////////////////////////////////////////////////////////////////////
+        // Some of this should definitely be moved out of the Form
+        ////////////////////////////////////////////////////////////////////////
 
         bool nodeContainsPath(TreeNode tvn, List<Collect2DSignature> sigList)
         {
@@ -711,172 +1148,21 @@ namespace JSONExtractor
             return findPivot(parent, sigList.Prepend(parentSig).ToList());
         }
 
-        ////////////////////////////////////////////////////////////////////////
-        // Select Input Files
-        ////////////////////////////////////////////////////////////////////////
-
-        void clearFileCounts()
-        {
-            filteredCount = 0;
-            extractedCount = 0;
-            processedCount = 0;
-            skipCount = 0;
-
-            progressBarStatus.Maximum = dedupedPathnames.Count;
-            progressBarStatus.Value = 0;
-
-            updateFileCounts();
-        }
-
-        void updateFileCounts()
-        {
-            labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
-            labelDedupedCount.Text = $"Deduped: {dedupedPathnames.Count}";
-            labelFilteredCount.Text = $"Filtered: {filteredCount}";
-            labelExtractedCount.Text = $"Extracted: {extractedCount}";
-            labelProcessedCount.Text = $"Processed: {processedCount}";
-            labelSkippedCount.Text = $"Skipped: {skipCount}";
-
-            progressBarStatus.Value = processedCount;
-
-            string tt = "unknown time remaining";
-            if (recentCompletionTimesSec.Count > 0)
-            {
-                var secPerRec = recentCompletionTimesSec.Average();
-                var secRemaining = (dedupedPathnames.Count - processedCount) * secPerRec;
-                tt = Util.timeRemainingLabel(secRemaining);
-            }
-            toolTip1.SetToolTip(progressBarStatus, tt);
-        }
-
-        /// <summary>
-        /// The user clicked the button to select an input directory, so let
-        /// them choose the directory and then read-in the list of .json files.
-        /// </summary>
-        /// <todo>create a file iterator...no need to actually keep these names in memory</todo>
-        private void buttonSelectInputDir_Click(object sender, EventArgs e)
-        {
-            var result = folderBrowserDialogInputDir.ShowDialog();
-            if (result != DialogResult.OK)
-                return;
-
-            Properties.Settings.Default.inputDir = folderBrowserDialogInputDir.SelectedPath;
-            saveSettings();
-
-            selectedPathnames = new List<string>();
-            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json"));
-            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json.gz"));
-
-            dedupeInputPathnames();
-        }
-
-        /// <summary>
-        /// Rather than select a whole directory, the user clicked the button to manually select one or more input files.
-        /// </summary>
-        private void buttonSelectFiles_Click(object sender, EventArgs e)
-        {
-            var result = openFileDialogInputFiles.ShowDialog();
-            if (result != DialogResult.OK)
-                return;
-
-            selectedPathnames = new List<string>();
-            selectedPathnames.AddRange(openFileDialogInputFiles.FileNames);
-
-            dedupeInputPathnames();
-        }
-
-        /// <summary>
-        /// This performs BOTH de-duping of "unique" filename tokens (like serial
-        /// number), to ensure that only the last record of a given token is 
-        /// processed, AND checking the "Within" clause using the same token.
-        /// </summary>
-        void dedupeInputPathnames()
-        {
-            selectedPathnames.Sort();
-            labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
-
-            if (!checkBoxDedupeFilenames.Checked)
-            {
-                dedupedPathnames = selectedPathnames;
-            }
-            else
-            {
-                ////////////////////////////////////////////////////////////////
-                // parse Within list (on comma if found, else whitespace)
-                ////////////////////////////////////////////////////////////////
-
-                HashSet<string> withinSet = new();
-                string withinStr = textBoxDedupeWithin.Text.Trim().ToLower();
-                if (withinStr.Length > 0)
-                {
-                    List<string> tok = new();
-                    if (withinStr.Contains(','))
-                    {
-                        foreach (var s in withinStr.Split(","))
-                            if (s.Trim().Length > 0)
-                                withinSet.Add(s.Trim());
-                    }
-                    else
-                    {
-                        foreach (var s in withinStr.Split())
-                            if (s.Trim().Length > 0)
-                                withinSet.Add(s.Trim());
-                    }
-                    logger.debug($"applying withinSet: {string.Join(", ", withinSet)}");
-                }
-
-                ////////////////////////////////////////////////////////////////
-                // Dedupe on unique token
-                ////////////////////////////////////////////////////////////////
-
-                var re = new Regex(textBoxDedupeFilenames.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
-                Dictionary<string, string> latestUnique = new Dictionary<string, string>();
-                foreach (var pathname in selectedPathnames)
-                {
-                    var basename = Path.GetFileName(pathname).Split(".").First();
-                    var match = re.Match(basename);
-                    if (match.Success && match.Groups.Count > 1)
-                    {
-                        var unique = match.Groups[1].Value;
-
-                        // if we defined a Within list, then first ensure this is
-                        // a valid element
-                        if (withinSet.Count > 0)
-                            if (!withinSet.Contains(unique.ToLower()))
-                                continue;
-                        
-                        latestUnique[unique] = pathname;
-                    }
-                    else
-                    {
-                        if (withinSet.Count == 0)
-                        {
-                            // we didn't match the pattern, so just store the
-                            // pathname directly (do this if we're "just"
-                            // dedupping...if a "Within" list was specified, this
-                            // is a fail)
-                            latestUnique[basename] = pathname;
-                        }
-                    }
-                }
-                dedupedPathnames = new();
-                foreach (var pair in latestUnique)
-                    dedupedPathnames.Add(pair.Value);
-                dedupedPathnames.Sort();
-            }
-
-            labelDedupedCount.Text = $"Deduped: {dedupedPathnames.Count}";
-            updateStartability();
-        }
+        private void comboBoxCollect1D_SelectedIndexChanged(object sender, EventArgs e) => updateExplanation();
+        private void comboBoxCollect2D_SelectedIndexChanged(object sender, EventArgs e) => updateExplanation();
+        private void checkBoxInterpolate_CheckedChanged(object sender, EventArgs e) => updateExplanation();
+        private void checkBoxGraph_CheckedChanged(object sender, EventArgs e) => updateExplanation();
 
         ////////////////////////////////////////////////////////////////////////
-        // Running an Extract
+        //                                                                    //
+        //                         Perform Extract                            //
+        //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
         /// <summary>
         /// The user clicked the button to start an extract.
         /// </summary>
-        private void buttonStart_Click(object sender, EventArgs e)
+        void buttonStart_Click(object sender, EventArgs e)
         {
             if (extractRunning)
             {
@@ -897,79 +1183,187 @@ namespace JSONExtractor
                 extractRunning = true;
 
                 clearFileCounts();
+                initExtractChartForExtract();
 
                 backgroundWorkerExtraction.RunWorkerAsync();
             }
         }
 
         ////////////////////////////////////////////////////////////////////////
-        // AWS S3
+        //                                                                    //
+        //                           Extract Chart                            //
+        //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
-        /// <summary>
-        /// The user clicked the button to select a directory to where S3 blobs
-        /// should be sync'd (sunk?), or alternately have already been sync'd
-        /// via awscli.
-        /// </summary>
-        private void buttonS3CacheDir_Click(object sender, EventArgs e)
+        // doing this programmatically because I deleted SQLServer and broke
+        // Visual Studio :-(
+        void initExtractChart()
         {
-            var result = folderBrowserDialogInputDir.ShowDialog();
-            if (result != DialogResult.OK)
-                return;
+            extractChart.Parent = splitContainerSeriesVsChart.Panel2;
+            extractChart.Dock = DockStyle.Fill;
 
-            s3CacheDir = folderBrowserDialogInputDir.SelectedPath;
-            toolTip1.SetToolTip(buttonS3CacheDir, s3CacheDir);
-            Properties.Settings.Default.s3CacheDir = s3CacheDir;
-            saveSettings();
+            ChartArea area = new();
+            area.BorderWidth = 1;
+            area.BorderColor = Color.Gray;
+            area.BorderDashStyle = ChartDashStyle.Solid;
+            area.ShadowOffset = 5;
+            area.AxisX.ScaleView.Zoomable = true;
+            area.AxisY.ScaleView.Zoomable = true;
+            area.CursorX.IsUserSelectionEnabled = true;
+            area.CursorY.IsUserSelectionEnabled = true;
+            extractChart.ChartAreas.Add(area);
+
+            Legend legend = new();
+            extractChart.Legends.Add(legend);
         }
 
-        /// <todo>add "time remaining" indicator</todo>
-        private async void buttonS3StartSync_Click(object sender, EventArgs e)
+        void initExtractChartForExtract()
         {
-            if (s3CacheDir is null)
+            chartAttributes = new();
+            comboBoxChart.Items.Clear();
+            foreach (var ea in extractAttributes)
             {
-                logger.error("must select S3 cache folder first");
-                return;
-            }
-            buttonS3StartSync.Enabled = false;
-
-            var cloud = new Cloud(accessKey: textBoxS3AccessKey.Text, secretKey: textBoxS3SecretKey.Text, bucket: textBoxS3Bucket.Text, cacheDir: s3CacheDir);
-
-            logger.info("downloading keys");
-            List<string> keys = await cloud.syncKeys();
-            logger.info($"received {keys.Count} keys");
-
-            progressBarStatus.Maximum = keys.Count;
-            keys.Sort();
-
-            logger.info("syncing files");
-            for (int i = 0; i < keys.Count; i++)
-            {
-                _ = await cloud.syncKey(keys[i]);
-                progressBarStatus.Value = i;
+                if (ea.graphRequested)
+                {
+                    // currently only support tables
+                    if (ea.isTable())
+                    {
+                        ea.abbr = Convert.ToChar('A' + chartAttributes.Count).ToString();
+                        chartAttributes.Add(ea);
+                        comboBoxChart.Items.Add(ea.label);
+                        logger.debug($"assigned abbr {ea.abbr} to {ea}");
+                    }
+                }
             }
 
-            logger.info("sync complete");
-            progressBarStatus.Value = 0;
-            buttonS3StartSync.Enabled = true;
+            // default to the first attribute
+            if (chartAttributes.Count > 0)
+                comboBoxChart.SelectedIndex = 0;
         }
 
-        private void textBoxS3Bucket_TextChanged(object sender, EventArgs e)
+        /// <see href="https://stackoverflow.com/a/40884366/11615696"/>
+        void addGraphableRecords(ExtractAttribute ea, Dictionary<string, List<double>> graphableRecords)
         {
-            Properties.Settings.Default.s3Bucket = textBoxS3Bucket.Text;
-            saveSettings();
+            if (!ea.graphRequested || graphableRecords is null)
+                return;
+
+            foreach (var pair in graphableRecords)
+            {
+                var key = pair.Key;
+                var values = pair.Value;
+
+                if (key is null || key.Length == 0 || values is null || values.Count == 0)
+                    continue;
+
+                CheckBox cb = new();
+                cb.Text = key;
+                cb.Checked = true;
+                cb.CheckedChanged += checkBoxExtractChart_CheckedChanged;
+                cb.AutoSize = true;
+
+                var panel = tableLayoutPanelSeries;
+
+                // base new rows on the first row
+                RowStyle first = panel.RowStyles[0];
+
+                var rowStyle = new RowStyle(SizeType.AutoSize, first.Height);
+                panel.RowStyles.Add(rowStyle);
+                panel.Controls.Add(cb, 0, panel.RowCount);
+                panel.RowCount++;
+
+                string label = ea.abbr + "." + key;
+                Series s = new Series(label);
+                s.ChartType = SeriesChartType.Line;
+
+                if (ea.interpolatedAxis is null)
+                    for (int i = 0; i < values.Count; i++)
+                        s.Points.AddXY(i, values[i]);
+                else
+                    for (int i = 0; i < ea.interpolatedAxis.newX.Count; i++)
+                        s.Points.AddXY(ea.interpolatedAxis.newX[i], values[i]);
+
+                extractChart.Series.Add(s);
+
+                GraphSeries gs = new GraphSeries()
+                {
+                    series = s,
+                    checkBox = cb,
+                    intendedCheckState = true
+                };
+                cb.Tag = gs; // urk
+                ea.graphSeries.Add(gs);
+
+                if (ea != selectedChartAttribute())
+                {
+                    gs.checkBox.Visible = false;
+                    gs.series.Enabled = false;
+                }
+            }
         }
 
-        private void textBoxS3AccessKey_TextChanged(object sender, EventArgs e) 
+        void checkBoxExtractChart_CheckedChanged(object sender, EventArgs e)
         {
-            Properties.Settings.Default.s3AccessKey = textBoxS3AccessKey.Text;
-            saveSettings();
+            var cb = sender as CheckBox;
+            var gs = (GraphSeries)cb.Tag;
+
+            gs.series.Enabled =
+            gs.intendedCheckState = cb.Checked;
         }
 
-        private void textBoxS3SecretKey_TextChanged(object sender, EventArgs e) 
+
+        private void buttonSelectNone_Click(object sender, EventArgs e)
         {
-            Properties.Settings.Default.s3SecretKey = textBoxS3SecretKey.Text;
-            saveSettings();
+            foreach (var ea in chartAttributes)
+                if (ea == selectedChartAttribute())
+                    foreach (var gs in ea.graphSeries)
+                        gs.checkBox.Checked = gs.intendedCheckState = false;
+
+        }
+
+        private void buttonSelectAll_Click(object sender, EventArgs e)
+        {
+            foreach (var ea in chartAttributes)
+                if (ea == selectedChartAttribute())
+                    foreach (var gs in ea.graphSeries)
+                        gs.checkBox.Checked = gs.intendedCheckState = true;
+        }
+
+        ExtractAttribute selectedChartAttribute()
+        {
+            if (comboBoxChart.SelectedIndex == -1)
+                return null;
+            return chartAttributes[comboBoxChart.SelectedIndex];
+        }
+
+        void comboBoxChart_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var selected = selectedChartAttribute();
+            logger.debug($"updating graph to show {selected}");
+
+            labelSelectedSeries.Text = $"{selected.label}\n{selected.jsonFullPath}\nCollect1D {selected.collect1D}\nCollect2D {selected.collect2D}";
+
+            foreach (var ea in chartAttributes)
+            {
+                if (ea == selected)
+                {
+                    logger.debug($"showing series and checkboxes for {ea}");
+                    foreach (var gs in ea.graphSeries)
+                    {
+                        gs.checkBox.Visible = true;
+                        gs.series.Enabled = true;
+                        gs.checkBox.Checked = gs.intendedCheckState;
+                    }
+                }
+                else
+                {
+                    logger.debug($"hiding series and checkboxes for {ea}");
+                    foreach (var gs in ea.graphSeries)
+                    {
+                        gs.checkBox.Visible = false;
+                        gs.series.Enabled = false;
+                    }
+                }
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -996,7 +1390,7 @@ namespace JSONExtractor
 
         void updateFileCountsDelegate() => labelExtractedCount.BeginInvoke(new MethodInvoker(delegate { updateFileCounts(); }));
 
-        private void BackgroundWorkerExtraction_DoWork(object sender, DoWorkEventArgs e)
+        void BackgroundWorkerExtraction_DoWork(object sender, DoWorkEventArgs e)
         {
             var worker = sender as BackgroundWorker;
 
@@ -1129,10 +1523,12 @@ namespace JSONExtractor
                     if (value != null)
                         hasData = true;
 
-                    // pass jsonObj so the ExtractAttribute can find its
-                    // coefficients if interpolation is called for
                     if (ea.isTable())
-                        ea.storeTable(value, recordKey, jsonObj);
+                    {
+                        var graphableRecords = ea.storeTable(value, recordKey, jsonObj);
+                        if (ea.graphRequested)
+                            extractChart.BeginInvoke(new MethodInvoker(delegate { addGraphableRecords(ea, graphableRecords); }));
+                    }
                     else
                         values.Add(ea.formatValue(value));
                 }
@@ -1167,54 +1563,17 @@ namespace JSONExtractor
             logger.info("Extraction done");
         }
 
-        private void BackgroundWorkerExtraction_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        void BackgroundWorkerExtraction_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
         }
 
-        private void BackgroundWorkerExtraction_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        void BackgroundWorkerExtraction_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             logger.info("Extraction completed");
             outfile.Close();
             buttonStart.Text = "Start";
             extractRunning = false;
             progressBarStatus.Value = 0;
-        }
-
-        private void dataGridViewAttributes_SelectionChanged(object sender, EventArgs e)
-        {
-            var rows = dataGridViewAttributes.SelectedRows;
-            if (rows.Count == 0)
-            {
-                logger.debug($"no rows selected");
-            }
-            else
-            {
-                logger.debug($"Attribute rows selected: {rows}");
-            }
-        }
-
-        class Collect2DSignature 
-        {
-            public Type type;
-            public Type subtype;
-            public int count;
-            public string name;
-
-            public override string ToString() => $"<< type {type} name {name} (subtype {subtype}[cnt {count}]) >>";
-        }
-
-        private void numericUpDownInterpolationStart_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
-        private void numericUpDownInterpolationEnd_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
-        private void numericUpDownInterpolationIncr_ValueChanged(object sender, EventArgs e) => updateInterpolationControls();
-
-        private void checkBoxDedupeFilenames_CheckedChanged(object sender, EventArgs e)
-        {
-            var cb = sender as CheckBox;
-            if (cb.Checked)
-                dedupeInputPathnames();
-            else
-                dedupedPathnames = selectedPathnames;
-            updateStartability();
         }
     }
 }

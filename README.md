@@ -11,12 +11,12 @@ CSV export they can readily load into Excel for crosstabs and charting.
 
 ## What this is Not
 
-The *ideal* end-state for S3-backed data would be a web application, hosted 
-natively on AWS, allowing users to point-and-click to specify filter criteria and
-fields to extract, letting the majority of the S3 I/O and processing run 
-internally on their data center, and then generating an extract file when 
-processing completes (probably itself posted to a different S3 bucket, with a 
-download link emailed to the requesting user).
+The *ideal* end-state for flexibly querying S3-backed data would be a web 
+application, hosted natively on AWS, allowing users to point-and-click to specify
+filter criteria and fields to extract, letting the majority of the S3 I/O and 
+processing run internally on their data center, and then generating an extract 
+file when processing completes (probably itself posted to a different S3 bucket,
+with a download link emailed to the requesting user).
 
 That would be a neatly encapsulated work-egg to contract out to an AWS web 
 developer. You may consider this utility as a stop-gap measure, used to 
@@ -37,11 +37,9 @@ So now there is one :-)
 
 # Backlog
 
+- Cancel button for Sync
 - Collect2 should only take first space-delimited matching names? (See DarkBackgroundTest)
 - shift-click for range of fields in Collect2?
-- built-in chart for each TableCols / TableRows
-- built-in chart for template mouseOvers
-- before/after comparator for dates
 
 # Architecture
 

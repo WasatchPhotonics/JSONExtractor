@@ -1,9 +1,14 @@
 # Changelog
 
+- 2022-05-27
+    - added Graph tab
+    - implemented 'Explain'
+- 2022-05-25 
+    - implemented Preview
 - 2022-05-23 1.2.4
     - rationalized Collect1D / Collect2D nomenclature
     - added Collect2D.Collate
-    - implemented Cloud (untested)
+    - implemented Cloud 
 - 2022-05-20 1.2.3
     - save/load config working
     - added automatic inference of collatability (detect 3D data)

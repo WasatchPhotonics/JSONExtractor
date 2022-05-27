@@ -83,6 +83,53 @@ namespace JSONExtractor
             return result;
         }
 
+        public static string getJsonType(IDictionary<string, object> node, string jsonPath)
+        {
+            string result = "";
+            var value = getJsonValue(node, jsonPath);
+            if (value == null)
+                result = "";
+            else if (value is List<object>)
+            {
+                var l = (List<object>)value;
+                var cnt = l.Count;
+                if (cnt == 0) 
+                    result = "List<object>";
+                else 
+                    result = $"List<{l[0].GetType()}>[{cnt}]";
+            }
+            else 
+                result = value.GetType().ToString();
+            return result.Replace("System.", "");
+        }
+
+        public static bool isJsonArrayDouble(IDictionary<string, object> node, string jsonPath)
+        {
+            var obj = getJsonValue(node, jsonPath);
+            if (!(obj is List<object>))
+                return false;
+            var l = (List<object>)obj;
+            try
+            {
+                double d;
+                foreach (var o in l)
+                    d = (double)o;
+            }
+            catch
+            {
+                return false;
+            }
+            return true;
+        }
+
+        public static List<double> getJsonArray(IDictionary<string, object> node, string jsonPath)
+        {
+            var obj = getJsonValue(node, jsonPath);
+            if (obj is List<object>)
+                return forceDouble((List<object>)obj);
+            return null;
+        }
+
         ////////////////////////////////////////////////////////////////////////
         // Math helpers
         ////////////////////////////////////////////////////////////////////////

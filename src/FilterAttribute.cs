@@ -98,8 +98,8 @@ namespace JSONExtractor
                 {
                     if (filterType == FilterType.DateBefore)
                         return date < dateThreshold;
-                    else // filterType == FilterType.DateAfter
-                        return dateThreshold < date;
+                    else 
+                        return date > dateThreshold;
                 }
                 else
                 {

@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Newtonsoft.Json;
+using System.Windows.Forms;
+using System.Windows.Forms.DataVisualization.Charting;
 
 namespace JSONExtractor
 {
@@ -75,6 +76,17 @@ namespace JSONExtractor
         // used for TableCols/Rows with interpolation
         public Interpolator.Axis interpolatedAxis;
         public SpectrumUtil.WavecalGenerator wavecalGenerator;
+
+        // used for extractChart
+        public bool graphRequested;
+        public List<GraphSeries> graphSeries = new();
+
+        // This is because I want to keep all Series on the extract Chart at once
+        // (some invisible) and don't want duplicate keys. This allows the same
+        // attribute label ("processed[]") and collated subkeys ("processed[].Measurement 1")
+        // to appear on different attributes (for instance, with different Collect2)
+        // ("A.processed[]", etc)
+        public string abbr = null;
 
         Logger logger = Logger.getInstance();
 
@@ -168,22 +180,28 @@ namespace JSONExtractor
         /// <param name="obj">The deserialized object we're to store in the table.  It is assumed that this object is a List of double.</param>
         /// <param name="recordKey">a label for the record we're storing, to be used in row/column headers (presumably basename)</param>
         /// <param name="jsonRoot">The root of the entire deserialized record being processed. If we're interpolating, we need this so we can extract the wavecal coeffs and excitation.</param>
-        public void storeTable(object obj, string recordKey, IDictionary<string, object> jsonRoot)
+        public Dictionary<string, List<double>> storeTable(object obj, string recordKey, IDictionary<string, object> jsonRoot)
         {
             if (doingCollation())
-                storeTableCollate(obj, recordKey, jsonRoot);
+            {
+                return storeTableCollate(obj, recordKey, jsonRoot);
+            }
             else
-                storeTable1D(obj, recordKey, jsonRoot);
+            {
+                var result = new Dictionary<string, List<double>>();
+                result.Add(recordKey, storeTable1D(obj, recordKey, jsonRoot));
+                return result;
+            }
         }
 
-        void storeTable1D(object obj, string recordKey, IDictionary<string, object> jsonRoot)
+        List<double> storeTable1D(object obj, string recordKey, IDictionary<string, object> jsonRoot)
         {
             if (obj is null)
-                return;
+                return null;
 
             var l = (List<object>)obj;
             if (l.Count == 0)
-                return;
+                return null;
 
             List<double> values;
             if (!doingCollect2D())
@@ -202,6 +220,7 @@ namespace JSONExtractor
             tableData.Add(values);
             if (tableDimension < values.Count)
                 tableDimension = values.Count;
+            return values;
         }
 
         /// <summary>
@@ -209,13 +228,15 @@ namespace JSONExtractor
         /// special case of collating (expanding) multiple arrays when 
         /// Collect2D.Collate is specified.
         /// </summary>
-        void storeTableCollate(object obj, string recordKey, IDictionary<string, object> jsonRoot)
+        Dictionary<string, List<double>> storeTableCollate(object obj, string recordKey, IDictionary<string, object> jsonRoot)
         {
             if (obj is null)
-                return;
+                return null;
 
             var pivotObj = Util.getJsonValue(jsonRoot, collect2DPivotPath);
             IDictionary<string, object> pivotNode = (IDictionary<string, object>)pivotObj;
+
+            Dictionary<string, List<double>> result = new();
 
             // iterate over the top-level keys of the pivot, collating
             // each into the output table
@@ -241,11 +262,15 @@ namespace JSONExtractor
                     values = interp.interpolate(interpolatedAxis.newX);
                 }
 
-                tableKeys.Add(recordKey + '\\' + pair.Key);
+                string name = recordKey + '\\' + pair.Key;
+                tableKeys.Add(name);
                 tableData.Add(values);
                 if (tableDimension < values.Count)
                     tableDimension = values.Count;
+
+                result.Add(name, values);
             }
+            return result;
         }
 
         /// <summary>
@@ -346,9 +371,11 @@ namespace JSONExtractor
             else
                 logger.error($"unsupported table type: {collect1D}");
 
-            tableData.Clear();
-            tableKeys.Clear();
-            tableDimension = 0;
+            // keep these for graph
+            //
+            // tableData.Clear();
+            // tableKeys.Clear();
+            // tableDimension = 0;
 
             return getTableName() + Environment.NewLine + table;
         }
