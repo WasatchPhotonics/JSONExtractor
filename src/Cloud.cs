@@ -24,7 +24,7 @@ namespace JSONExtractor
         int keysToDownload;
         int keysDownloaded;
 
-        public BackgroundWorker worker = new();
+        public BackgroundWorker worker = new() { WorkerReportsProgress = true, WorkerSupportsCancellation = true };
         public bool running;
 
         Amazon.RegionEndpoint region = Amazon.RegionEndpoint.USEast2;
@@ -32,19 +32,24 @@ namespace JSONExtractor
 
         ProgressBar progressBar;
         Button buttonStart;
+        ToolTip toolTip;
+
+        List<double> recentCompletionTimesSec = new List<double>();
+        const int COMPLETION_TIMES_WINDOW = 10;
 
         Logger logger = Logger.getInstance();
 
-        public Cloud(Button button, ProgressBar pb)
+        public Cloud(Button button, ProgressBar pb, ToolTip toolTip)
         {
             this.buttonStart = button;
             this.progressBar = pb;
+            this.toolTip = toolTip;
 
             worker.DoWork += Worker_DoWork;
             worker.ProgressChanged += Worker_ProgressChanged;
             worker.RunWorkerCompleted += Worker_RunWorkerCompleted;
         }
-        
+
         public void start(string accessKey, string secretKey, string bucket, string cacheDir)
         {
             this.accessKey = accessKey;
@@ -52,6 +57,7 @@ namespace JSONExtractor
             this.bucket = bucket;
             this.cacheDir = cacheDir;
 
+            logger.debug("creating AWS client");
             client = new AmazonS3Client(accessKey, secretKey, region);
 
             worker.RunWorkerAsync();
@@ -62,8 +68,10 @@ namespace JSONExtractor
             worker.CancelAsync();
         }
 
-        async void Worker_DoWork(object sender, DoWorkEventArgs e)
+        void Worker_DoWork(object sender, DoWorkEventArgs e)
         {
+            running = true;
+
             logger.debug("counting cached files");
             var existingCount = Directory.EnumerateFiles(cacheDir).Count();
 
@@ -75,7 +83,12 @@ namespace JSONExtractor
             {
                 try
                 {
-                    listResponse = await client.ListObjectsV2Async(listRequest);
+                    if (client is null)
+                    {
+                        logger.error("AWS client is null?!");
+                        return;
+                    }
+                    listResponse = client.ListObjectsV2Async(listRequest).Result;
                 }
                 catch(Exception ex)
                 {
@@ -94,6 +107,7 @@ namespace JSONExtractor
                 }
                 foreach (var s3Obj in listResponse.S3Objects)
                     keys.Add(s3Obj.Key);
+                logger.debug($"now have {keys.Count} keys");
                 listRequest.ContinuationToken = listResponse.NextContinuationToken;
             } while (listResponse.IsTruncated);
             logger.info($"received {keys.Count} keys");
@@ -105,8 +119,15 @@ namespace JSONExtractor
             keys.Reverse();
 
             logger.info("syncing files");
+            DateTime lastStart = DateTime.Now;
             foreach (var key in keys)
             { 
+                var elapsedSec = (DateTime.Now - lastStart).TotalSeconds;
+                while (recentCompletionTimesSec.Count >= COMPLETION_TIMES_WINDOW)
+                    recentCompletionTimesSec.RemoveAt(0);
+                recentCompletionTimesSec.Add(elapsedSec);
+                lastStart = DateTime.Now;
+
                 string pathnameJson = Path.Join(cacheDir, key + ".json");
                 string pathnameJsonGz = pathnameJson + ".gz";
                 if (File.Exists(pathnameJsonGz))
@@ -114,7 +135,7 @@ namespace JSONExtractor
 
                 logger.info($"downloading {key}");
                 var objRequest = new GetObjectRequest() { BucketName = bucket, Key = key };
-                var objResponse = await client.GetObjectAsync(objRequest);
+                var objResponse = client.GetObjectAsync(objRequest).Result;
 
                 using (FileStream writer = File.OpenWrite(pathnameJsonGz))
                 using (GZipStream zip = new GZipStream(writer, CompressionMode.Compress))
@@ -138,10 +159,20 @@ namespace JSONExtractor
         {
             progressBar.Maximum = keysToDownload;
             progressBar.Value = keysDownloaded;
+
+            string tt = "unknown time remaining";
+            if (recentCompletionTimesSec.Count > 0)
+            {
+                var secPerRec = recentCompletionTimesSec.Average();
+                var secRemaining = (keysToDownload - keysDownloaded) * secPerRec;
+                tt = Util.timeRemainingLabel(secRemaining);
+            }
+            toolTip.SetToolTip(progressBar, tt);
         }
 
         void Worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            logger.info("sync worker stopped");
             progressBar.Value = 0;
             buttonStart.Text = "Start Sync";
             client = null;

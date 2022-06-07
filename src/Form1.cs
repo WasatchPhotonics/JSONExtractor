@@ -90,7 +90,7 @@ namespace JSONExtractor
             initPreviewChart();
             initExtractChart();
 
-            cloud = new Cloud(buttonS3StartSync, progressBarStatus);
+            cloud = new Cloud(buttonS3StartSync, progressBarStatus, toolTip1);
 
             labelSelectedName.Text =
                 labelSelectedType.Text = "";

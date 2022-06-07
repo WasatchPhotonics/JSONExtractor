@@ -134,6 +134,9 @@ namespace JSONExtractor
             this.flowLayoutPanelSeriesScrolling = new System.Windows.Forms.FlowLayoutPanel();
             this.comboBoxChart = new System.Windows.Forms.ComboBox();
             this.tableLayoutPanelSeries = new System.Windows.Forms.TableLayoutPanel();
+            this.tableLayoutPanel9 = new System.Windows.Forms.TableLayoutPanel();
+            this.buttonSelectNone = new System.Windows.Forms.Button();
+            this.buttonSelectAll = new System.Windows.Forms.Button();
             this.labelSelectedSeries = new System.Windows.Forms.Label();
             this.tableLayoutPanelProgressAndLog = new System.Windows.Forms.TableLayoutPanel();
             this.groupBoxEventLog = new System.Windows.Forms.GroupBox();
@@ -147,9 +150,6 @@ namespace JSONExtractor
             this.saveFileDialogExtract = new System.Windows.Forms.SaveFileDialog();
             this.saveFileDialogConfig = new System.Windows.Forms.SaveFileDialog();
             this.openFileDialogConfig = new System.Windows.Forms.OpenFileDialog();
-            this.tableLayoutPanel9 = new System.Windows.Forms.TableLayoutPanel();
-            this.buttonSelectNone = new System.Windows.Forms.Button();
-            this.buttonSelectAll = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerTopVsBottom)).BeginInit();
             this.splitContainerTopVsBottom.Panel1.SuspendLayout();
             this.splitContainerTopVsBottom.Panel2.SuspendLayout();
@@ -212,9 +212,9 @@ namespace JSONExtractor
             this.splitContainerSeriesVsChart.SuspendLayout();
             this.flowLayoutPanelSeriesScrolling.SuspendLayout();
             this.tableLayoutPanelSeries.SuspendLayout();
+            this.tableLayoutPanel9.SuspendLayout();
             this.tableLayoutPanelProgressAndLog.SuspendLayout();
             this.groupBoxEventLog.SuspendLayout();
-            this.tableLayoutPanel9.SuspendLayout();
             this.SuspendLayout();
             // 
             // splitContainerTopVsBottom
@@ -1614,6 +1614,42 @@ namespace JSONExtractor
             this.tableLayoutPanelSeries.Size = new System.Drawing.Size(206, 101);
             this.tableLayoutPanelSeries.TabIndex = 3;
             // 
+            // tableLayoutPanel9
+            // 
+            this.tableLayoutPanel9.AutoSize = true;
+            this.tableLayoutPanel9.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tableLayoutPanel9.ColumnCount = 2;
+            this.tableLayoutPanel9.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            this.tableLayoutPanel9.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            this.tableLayoutPanel9.Controls.Add(this.buttonSelectNone, 0, 0);
+            this.tableLayoutPanel9.Controls.Add(this.buttonSelectAll, 1, 0);
+            this.tableLayoutPanel9.Location = new System.Drawing.Point(3, 63);
+            this.tableLayoutPanel9.Name = "tableLayoutPanel9";
+            this.tableLayoutPanel9.RowCount = 1;
+            this.tableLayoutPanel9.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel9.Size = new System.Drawing.Size(200, 35);
+            this.tableLayoutPanel9.TabIndex = 0;
+            // 
+            // buttonSelectNone
+            // 
+            this.buttonSelectNone.Location = new System.Drawing.Point(3, 3);
+            this.buttonSelectNone.Name = "buttonSelectNone";
+            this.buttonSelectNone.Size = new System.Drawing.Size(94, 29);
+            this.buttonSelectNone.TabIndex = 0;
+            this.buttonSelectNone.Text = "None";
+            this.buttonSelectNone.UseVisualStyleBackColor = true;
+            this.buttonSelectNone.Click += new System.EventHandler(this.buttonSelectNone_Click);
+            // 
+            // buttonSelectAll
+            // 
+            this.buttonSelectAll.Location = new System.Drawing.Point(103, 3);
+            this.buttonSelectAll.Name = "buttonSelectAll";
+            this.buttonSelectAll.Size = new System.Drawing.Size(94, 29);
+            this.buttonSelectAll.TabIndex = 1;
+            this.buttonSelectAll.Text = "All";
+            this.buttonSelectAll.UseVisualStyleBackColor = true;
+            this.buttonSelectAll.Click += new System.EventHandler(this.buttonSelectAll_Click);
+            // 
             // labelSelectedSeries
             // 
             this.labelSelectedSeries.AutoSize = true;
@@ -1628,7 +1664,7 @@ namespace JSONExtractor
             // 
             this.tableLayoutPanelProgressAndLog.AutoSize = true;
             this.tableLayoutPanelProgressAndLog.ColumnCount = 1;
-            this.tableLayoutPanelProgressAndLog.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            this.tableLayoutPanelProgressAndLog.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tableLayoutPanelProgressAndLog.Controls.Add(this.groupBoxEventLog, 0, 1);
             this.tableLayoutPanelProgressAndLog.Controls.Add(this.progressBarStatus, 0, 0);
             this.tableLayoutPanelProgressAndLog.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -1648,7 +1684,7 @@ namespace JSONExtractor
             this.groupBoxEventLog.Margin = new System.Windows.Forms.Padding(2, 1, 2, 1);
             this.groupBoxEventLog.Name = "groupBoxEventLog";
             this.groupBoxEventLog.Padding = new System.Windows.Forms.Padding(2, 1, 2, 1);
-            this.groupBoxEventLog.Size = new System.Drawing.Size(1662, 165);
+            this.groupBoxEventLog.Size = new System.Drawing.Size(1574, 165);
             this.groupBoxEventLog.TabIndex = 0;
             this.groupBoxEventLog.TabStop = false;
             this.groupBoxEventLog.Text = "Event Log";
@@ -1661,7 +1697,7 @@ namespace JSONExtractor
             this.textBoxEventLog.Multiline = true;
             this.textBoxEventLog.Name = "textBoxEventLog";
             this.textBoxEventLog.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.textBoxEventLog.Size = new System.Drawing.Size(1658, 143);
+            this.textBoxEventLog.Size = new System.Drawing.Size(1570, 143);
             this.textBoxEventLog.TabIndex = 0;
             // 
             // progressBarStatus
@@ -1670,7 +1706,7 @@ namespace JSONExtractor
             this.progressBarStatus.Location = new System.Drawing.Point(4, 4);
             this.progressBarStatus.Margin = new System.Windows.Forms.Padding(4);
             this.progressBarStatus.Name = "progressBarStatus";
-            this.progressBarStatus.Size = new System.Drawing.Size(1658, 32);
+            this.progressBarStatus.Size = new System.Drawing.Size(1570, 32);
             this.progressBarStatus.TabIndex = 0;
             // 
             // openFileDialogSample
@@ -1709,42 +1745,6 @@ namespace JSONExtractor
             this.openFileDialogConfig.DefaultExt = "json";
             this.openFileDialogConfig.FileName = "config.json";
             this.openFileDialogConfig.Title = "Select the configuration you wish to load";
-            // 
-            // tableLayoutPanel9
-            // 
-            this.tableLayoutPanel9.AutoSize = true;
-            this.tableLayoutPanel9.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-            this.tableLayoutPanel9.ColumnCount = 2;
-            this.tableLayoutPanel9.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this.tableLayoutPanel9.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this.tableLayoutPanel9.Controls.Add(this.buttonSelectNone, 0, 0);
-            this.tableLayoutPanel9.Controls.Add(this.buttonSelectAll, 1, 0);
-            this.tableLayoutPanel9.Location = new System.Drawing.Point(3, 63);
-            this.tableLayoutPanel9.Name = "tableLayoutPanel9";
-            this.tableLayoutPanel9.RowCount = 1;
-            this.tableLayoutPanel9.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel9.Size = new System.Drawing.Size(200, 35);
-            this.tableLayoutPanel9.TabIndex = 0;
-            // 
-            // buttonSelectNone
-            // 
-            this.buttonSelectNone.Location = new System.Drawing.Point(3, 3);
-            this.buttonSelectNone.Name = "buttonSelectNone";
-            this.buttonSelectNone.Size = new System.Drawing.Size(94, 29);
-            this.buttonSelectNone.TabIndex = 0;
-            this.buttonSelectNone.Text = "None";
-            this.buttonSelectNone.UseVisualStyleBackColor = true;
-            this.buttonSelectNone.Click += new System.EventHandler(this.buttonSelectNone_Click);
-            // 
-            // buttonSelectAll
-            // 
-            this.buttonSelectAll.Location = new System.Drawing.Point(103, 3);
-            this.buttonSelectAll.Name = "buttonSelectAll";
-            this.buttonSelectAll.Size = new System.Drawing.Size(94, 29);
-            this.buttonSelectAll.TabIndex = 1;
-            this.buttonSelectAll.Text = "All";
-            this.buttonSelectAll.UseVisualStyleBackColor = true;
-            this.buttonSelectAll.Click += new System.EventHandler(this.buttonSelectAll_Click);
             // 
             // Form1
             // 
@@ -1832,10 +1832,10 @@ namespace JSONExtractor
             this.flowLayoutPanelSeriesScrolling.PerformLayout();
             this.tableLayoutPanelSeries.ResumeLayout(false);
             this.tableLayoutPanelSeries.PerformLayout();
+            this.tableLayoutPanel9.ResumeLayout(false);
             this.tableLayoutPanelProgressAndLog.ResumeLayout(false);
             this.groupBoxEventLog.ResumeLayout(false);
             this.groupBoxEventLog.PerformLayout();
-            this.tableLayoutPanel9.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
