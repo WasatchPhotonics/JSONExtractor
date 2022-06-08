@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
-using System.Windows.Forms.DataVisualization.Charting;
 
 namespace JSONExtractor
 {
@@ -63,6 +61,8 @@ namespace JSONExtractor
         public string defaultValue { get; set; }
         public Collect1D? collect1D { get; set; } = null;
         public Collect2D? collect2D{ get; set; } = null;
+        public string interpolated { get => interpolatedAxis is null ? "" : interpolatedAxis.range(); }
+        public bool graph { get; set; }
         public string jsonFullPath { get; set; }
 
         public string collect2DPivotPath { get; set; }
@@ -78,7 +78,6 @@ namespace JSONExtractor
         public SpectrumUtil.WavecalGenerator wavecalGenerator;
 
         // used for extractChart
-        public bool graphRequested;
         public List<GraphSeries> graphSeries = new();
 
         // This is because I want to keep all Series on the extract Chart at once
@@ -113,7 +112,12 @@ namespace JSONExtractor
                 return obj.ToString();
         }
 
-        string formatDouble(double d) => (precision < 0) ? d.ToString() : decimal.Round(new decimal(d), precision).ToString();
+        string formatDouble(double d, int prec=0)
+        {
+            if (prec == 0)
+                prec = precision;
+            return (prec < 0) ? d.ToString() : decimal.Round(new decimal(d), prec).ToString();
+        }
 
         /// <summary>
         /// Probably a clever way to do this using LINQ.
@@ -214,6 +218,7 @@ namespace JSONExtractor
                 List<double> oldX = wavecalGenerator.generateAxis(jsonRoot, values.Count);
                 Interpolator interp = new Interpolator(oldX, values);
                 values = interp.interpolate(interpolatedAxis.newX);
+                // logger.debug($"storeTable: interpolated values from oldX ({oldX.First():f2}, {oldX.Last():f2}) to newX ({interpolatedAxis.newX.First():f2}, {interpolatedAxis.newX.Last():f2})");
             }
 
             tableKeys.Add(recordKey);
@@ -371,12 +376,6 @@ namespace JSONExtractor
             else
                 logger.error($"unsupported table type: {collect1D}");
 
-            // keep these for graph
-            //
-            // tableData.Clear();
-            // tableKeys.Clear();
-            // tableDimension = 0;
-
             return getTableName() + Environment.NewLine + table;
         }
 
@@ -386,7 +385,7 @@ namespace JSONExtractor
             sb.AppendLine(wavecalGenerator.getLabel() + "," + string.Join(",", tableKeys)); // header row (record labels)
             for (int row = 0; row < interpolatedAxis.newX.Count; row++)
             {
-                sb.Append(formatDouble(interpolatedAxis.newX[row])); // header column (e.g. wavelength or wavenumber)
+                sb.Append(formatDouble(interpolatedAxis.newX[row], 2)); // header column (e.g. wavelength or wavenumber)
                 for (int col = 0; col < tableData.Count; col++)
                 {
                     sb.Append(",");

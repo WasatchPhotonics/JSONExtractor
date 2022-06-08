@@ -36,7 +36,7 @@ namespace JSONExtractor
         /// <remarks>
         /// assumes x is sorted, and y is in the same order
         /// </remarks>
-        public Interpolator(List<double> oldX, List<double> oldY)
+        public Interpolator(in List<double> oldX, in List<double> oldY)
         {
             if (oldX == null) throw new Exception("oldX null");
             if (oldY == null) throw new Exception("oldY null");
@@ -64,7 +64,7 @@ namespace JSONExtractor
         /// </summary>
         /// <param name="newX">the new x-axis to which we should interpolate the stored y values</param>
         /// <returns></returns>
-        public List<double> interpolate(List<double> newX)
+        public List<double> interpolate(in List<double> newX)
         {
             List<double> newY = new();
             foreach (var x in newX)
@@ -80,7 +80,7 @@ namespace JSONExtractor
         /// values. It should still work if used as "random access" into the
         /// data, just more slowly
         /// </remarks>
-        public double interpolate(double newX)
+        public double interpolate(in double newX)
         {
             // handle corner-cases fast (leave 'pos' where it is) - no misleadingly cute extrapolation, 
             // just treat first and last values as infinite series
@@ -119,7 +119,7 @@ namespace JSONExtractor
 
         public class Axis
         {
-            public List<double> newX;
+            public List<double> newX { get; }
             public Axis(List<double> newX) { this.newX = newX; }
             public Axis(int start, int end, double incr)
             {
@@ -127,6 +127,8 @@ namespace JSONExtractor
                 for (double x = start, steps = 0; x < end; steps++)
                     newX.Add(x = start + steps * incr);
             }
+
+            public string range() => newX is null ? "" : $"({newX.First():f2}, {newX.Last():f2})";
         }
     }
 }

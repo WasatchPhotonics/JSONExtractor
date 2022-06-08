@@ -51,6 +51,8 @@ namespace JSONExtractor
         public static object getJsonValue(IDictionary<string, object> node, string jsonPath, string defaultValue = null)
         {
             object result = defaultValue;
+            if (jsonPath is null)
+                return result;
             var tok = jsonPath.Split("\\");
             try
             {

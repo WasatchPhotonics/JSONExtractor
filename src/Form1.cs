@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Drawing;
+using System.Threading.Tasks;
 
 namespace JSONExtractor
 {
@@ -96,7 +97,16 @@ namespace JSONExtractor
                 labelSelectedType.Text = "";
             updateExplanation();
 
+            Task.Delay(1000).ContinueWith(t => this.BeginInvoke(new MethodInvoker(delegate { postConstruction(); })));
+
             logger.initializationComplete = true;
+        }
+
+        // do these after the constructor, so the form is fully visible and you can see the log messages
+        void postConstruction()
+        {
+            loadPathnamesFromInputDir();
+            loadSampleJsonFile();
         }
 
         // Balance GUI (Visual Studio keeps resizing things?).
@@ -135,16 +145,15 @@ namespace JSONExtractor
             if (k.s3AccessKey is not null) textBoxS3AccessKey.Text = k.s3AccessKey;
             if (k.s3SecretKey is not null) textBoxS3SecretKey.Text = k.s3SecretKey;
             if (k.s3Bucket is not null) textBoxS3Bucket.Text = k.s3Bucket;
+            if (k.inputDir is not null) folderBrowserDialogInputDir.SelectedPath = k.inputDir;
+            if (k.dedupeRegex is not null && k.dedupeRegex.Length > 0) textBoxDedupeRegex.Text = k.dedupeRegex;
+            if (k.dedupeWithin is not null) textBoxDedupeWithin.Text = k.dedupeWithin;
 
             if (k.s3CacheDir is not null)
             {
                 s3CacheDir = k.s3CacheDir;
                 folderBrowserDialogInputDir.SelectedPath = s3CacheDir;
                 toolTip1.SetToolTip(buttonS3CacheDir, s3CacheDir);
-            }
-            else if (k.inputDir is not null)
-            {
-                folderBrowserDialogInputDir.SelectedPath = k.inputDir;
             }
         }
 
@@ -316,11 +325,7 @@ namespace JSONExtractor
             Properties.Settings.Default.inputDir = folderBrowserDialogInputDir.SelectedPath;
             saveSettings();
 
-            selectedPathnames = new List<string>();
-            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json"));
-            selectedPathnames.AddRange(Directory.GetFiles(folderBrowserDialogInputDir.SelectedPath, "*.json.gz"));
-
-            dedupeInputPathnames();
+            loadPathnamesFromInputDir();
         }
 
         /// <summary>
@@ -334,6 +339,37 @@ namespace JSONExtractor
 
             selectedPathnames = new List<string>();
             selectedPathnames.AddRange(openFileDialogInputFiles.FileNames);
+
+            dedupeInputPathnames();
+        }
+
+        void loadPathnamesFromInputDir()
+        {
+            selectedPathnames = new List<string>();
+
+            var inputDir = Properties.Settings.Default.inputDir;
+            if (!Directory.Exists(inputDir))
+                return;
+
+            logger.info($"loading JSON filenames from {inputDir}");
+            selectedPathnames.AddRange(Directory.GetFiles(inputDir, "*.json"));
+            selectedPathnames.AddRange(Directory.GetFiles(inputDir, "*.json.gz"));
+
+            dedupeInputPathnames();
+        }
+
+        private void textBoxDedupeWithin_TextChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.dedupeWithin = textBoxDedupeWithin.Text;
+            saveSettings();
+
+            dedupeInputPathnames();
+        }
+
+        private void textBoxDedupeRegex_TextChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.dedupeRegex = textBoxDedupeRegex.Text;
+            saveSettings();
 
             dedupeInputPathnames();
         }
@@ -356,7 +392,7 @@ namespace JSONExtractor
             {
                 // parse Within list (on comma if found, else whitespace)
                 HashSet<string> withinSet = new();
-                string withinStr = textBoxDedupeWithin.Text.Trim().ToLower();
+                string withinStr = Properties.Settings.Default.dedupeWithin.Trim().ToLower();
                 if (withinStr.Length > 0)
                 {
                     List<string> tok = new();
@@ -375,7 +411,7 @@ namespace JSONExtractor
                 }
 
                 // Dedupe on unique token
-                var re = new Regex(textBoxDedupeFilenames.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                var re = new Regex(textBoxDedupeRegex.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
                 Dictionary<string, string> latestUnique = new Dictionary<string, string>();
                 foreach (var pathname in selectedPathnames)
                 {
@@ -412,19 +448,13 @@ namespace JSONExtractor
                 dedupedPathnames.Sort();
             }
 
+            logger.info($"deduped {dedupedPathnames.Count} filenames out of {selectedPathnames.Count}");
             labelDedupedCount.Text = $"Deduped: {dedupedPathnames.Count}";
+
             updateStartability();
         }
 
-        void checkBoxDedupeFilenames_CheckedChanged(object sender, EventArgs e)
-        {
-            var cb = sender as CheckBox;
-            if (cb.Checked)
-                dedupeInputPathnames();
-            else
-                dedupedPathnames = selectedPathnames;
-            updateStartability();
-        }
+        void checkBoxDedupeFilenames_CheckedChanged(object sender, EventArgs e) => dedupeInputPathnames();
 
         ////////////////////////////////////////////////////////////////////////
         //                                                                    //
@@ -439,15 +469,26 @@ namespace JSONExtractor
         /// <see cref="https://stackoverflow.com/a/31250524/6436775"/>
         void buttonLoadSample_Click(object sender, EventArgs e)
         {
-            treeRoot = null;
-            treeViewJSON.Nodes.Clear();
-            toolTip1.SetToolTip(buttonLoadSample, null);
-
             var result = openFileDialogSample.ShowDialog();
             if (result != DialogResult.OK)
                 return;
 
-            var samplePathname = openFileDialogSample.FileName;
+            Properties.Settings.Default.sampleJsonFile = openFileDialogSample.FileName;
+            saveSettings();
+
+            loadSampleJsonFile();
+        }
+
+        void loadSampleJsonFile()
+        { 
+            treeRoot = null;
+            treeViewJSON.Nodes.Clear();
+            toolTip1.SetToolTip(buttonLoadSample, "load JSON file to use as schema template");
+
+            var samplePathname = Properties.Settings.Default.sampleJsonFile;
+            if (!File.Exists(samplePathname))
+                return;
+
             try
             {
                 logger.info($"loading {samplePathname}");
@@ -839,7 +880,7 @@ namespace JSONExtractor
                     typeof(ExtractAttribute.Collect2D), comboBoxCollect2D.Text);
             }
 
-            ea.graphRequested = checkBoxGraph.Checked;
+            ea.graph = checkBoxGraph.Checked;
 
             logger.debug($"adding {ea}");
             extractAttributes.Add(ea);
@@ -1211,6 +1252,7 @@ namespace JSONExtractor
             area.AxisY.ScaleView.Zoomable = true;
             area.CursorX.IsUserSelectionEnabled = true;
             area.CursorY.IsUserSelectionEnabled = true;
+            area.AxisX.LabelStyle.Format = "f2";
             extractChart.ChartAreas.Add(area);
 
             Legend legend = new();
@@ -1219,11 +1261,12 @@ namespace JSONExtractor
 
         void initExtractChartForExtract()
         {
+            extractChart.Series.Clear();
             chartAttributes = new();
             comboBoxChart.Items.Clear();
             foreach (var ea in extractAttributes)
             {
-                if (ea.graphRequested)
+                if (ea.graph)
                 {
                     // currently only support tables
                     if (ea.isTable())
@@ -1244,7 +1287,7 @@ namespace JSONExtractor
         /// <see href="https://stackoverflow.com/a/40884366/11615696"/>
         void addGraphableRecords(ExtractAttribute ea, Dictionary<string, List<double>> graphableRecords)
         {
-            if (!ea.graphRequested || graphableRecords is null)
+            if (!ea.graph || graphableRecords is null)
                 return;
 
             foreach (var pair in graphableRecords)
@@ -1308,8 +1351,9 @@ namespace JSONExtractor
 
             gs.series.Enabled =
             gs.intendedCheckState = cb.Checked;
-        }
 
+            // logger.debug($"toggled {gs}");
+        }
 
         private void buttonSelectNone_Click(object sender, EventArgs e)
         {
@@ -1346,24 +1390,19 @@ namespace JSONExtractor
             {
                 if (ea == selected)
                 {
-                    logger.debug($"showing series and checkboxes for {ea}");
                     foreach (var gs in ea.graphSeries)
                     {
-                        gs.checkBox.Visible = true;
-                        gs.series.Enabled = true;
+                        gs.checkBox.Visible = gs.series.Enabled = true;
                         gs.checkBox.Checked = gs.intendedCheckState;
                     }
                 }
                 else
                 {
-                    logger.debug($"hiding series and checkboxes for {ea}");
                     foreach (var gs in ea.graphSeries)
-                    {
-                        gs.checkBox.Visible = false;
-                        gs.series.Enabled = false;
-                    }
+                        gs.checkBox.Visible = gs.series.Enabled = false;
                 }
             }
+            extractChart.ChartAreas[0].RecalculateAxesScale();
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -1526,7 +1565,7 @@ namespace JSONExtractor
                     if (ea.isTable())
                     {
                         var graphableRecords = ea.storeTable(value, recordKey, jsonObj);
-                        if (ea.graphRequested)
+                        if (ea.graph)
                             extractChart.BeginInvoke(new MethodInvoker(delegate { addGraphableRecords(ea, graphableRecords); }));
                     }
                     else

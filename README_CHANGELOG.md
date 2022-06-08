@@ -1,6 +1,8 @@
 # Changelog
 
-- 2022-05-27
+- 2022-06-08 1.4.0
+    - graphing works well
+- 2022-05-27 1.3.0
     - added Graph tab
     - implemented 'Explain'
 - 2022-05-25 

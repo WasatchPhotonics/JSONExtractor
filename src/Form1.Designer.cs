@@ -41,7 +41,7 @@ namespace JSONExtractor
             this.groupBox2 = new System.Windows.Forms.GroupBox();
             this.textBoxDedupeWithin = new System.Windows.Forms.TextBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
-            this.textBoxDedupeFilenames = new System.Windows.Forms.TextBox();
+            this.textBoxDedupeRegex = new System.Windows.Forms.TextBox();
             this.buttonLoadSample = new System.Windows.Forms.Button();
             this.buttonSelectFiles = new System.Windows.Forms.Button();
             this.checkBoxDedupeFilenames = new System.Windows.Forms.CheckBox();
@@ -365,10 +365,11 @@ namespace JSONExtractor
             this.textBoxDedupeWithin.TabIndex = 3;
             this.toolTip1.SetToolTip(this.textBoxDedupeWithin, "Comma-delimited list of \"allowed\" strings (serial number, etc) from the regular e" +
         "xpression\'s first matching group");
+            this.textBoxDedupeWithin.TextChanged += new System.EventHandler(this.textBoxDedupeWithin_TextChanged);
             // 
             // groupBox1
             // 
-            this.groupBox1.Controls.Add(this.textBoxDedupeFilenames);
+            this.groupBox1.Controls.Add(this.textBoxDedupeRegex);
             this.groupBox1.Location = new System.Drawing.Point(2, 137);
             this.groupBox1.Margin = new System.Windows.Forms.Padding(2);
             this.groupBox1.Name = "groupBox1";
@@ -378,16 +379,17 @@ namespace JSONExtractor
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Regex";
             // 
-            // textBoxDedupeFilenames
+            // textBoxDedupeRegex
             // 
-            this.textBoxDedupeFilenames.Location = new System.Drawing.Point(4, 24);
-            this.textBoxDedupeFilenames.Name = "textBoxDedupeFilenames";
-            this.textBoxDedupeFilenames.Size = new System.Drawing.Size(160, 27);
-            this.textBoxDedupeFilenames.TabIndex = 1;
-            this.textBoxDedupeFilenames.Text = "^\\d{14}-(.*)$";
-            this.toolTip1.SetToolTip(this.textBoxDedupeFilenames, "Regular expression used for dedupping and/or \"Within\" clause (i.e., identifying t" +
+            this.textBoxDedupeRegex.Location = new System.Drawing.Point(4, 24);
+            this.textBoxDedupeRegex.Name = "textBoxDedupeRegex";
+            this.textBoxDedupeRegex.Size = new System.Drawing.Size(160, 27);
+            this.textBoxDedupeRegex.TabIndex = 1;
+            this.textBoxDedupeRegex.Text = "^\\d{14}-(.*)$";
+            this.toolTip1.SetToolTip(this.textBoxDedupeRegex, "Regular expression used for dedupping and/or \"Within\" clause (i.e., identifying t" +
         "he serial number portion of a filename appearing after a 14-digit datetime value" +
         ")");
+            this.textBoxDedupeRegex.TextChanged += new System.EventHandler(this.textBoxDedupeRegex_TextChanged);
             // 
             // buttonLoadSample
             // 
@@ -1296,6 +1298,7 @@ namespace JSONExtractor
             this.comboBoxCollect2D.Name = "comboBoxCollect2D";
             this.comboBoxCollect2D.Size = new System.Drawing.Size(90, 28);
             this.comboBoxCollect2D.TabIndex = 14;
+            this.toolTip1.SetToolTip(this.comboBoxCollect2D, "Allows combining multiple list/array attributes");
             this.comboBoxCollect2D.SelectedIndexChanged += new System.EventHandler(this.comboBoxCollect2D_SelectedIndexChanged);
             // 
             // label8
@@ -1424,7 +1427,7 @@ namespace JSONExtractor
             this.comboBoxCollect1D.Name = "comboBoxCollect1D";
             this.comboBoxCollect1D.Size = new System.Drawing.Size(90, 28);
             this.comboBoxCollect1D.TabIndex = 2;
-            this.toolTip1.SetToolTip(this.comboBoxCollect1D, "How to handle lists or arrays");
+            this.toolTip1.SetToolTip(this.comboBoxCollect1D, "How to output a single list/array attribute");
             this.comboBoxCollect1D.SelectedIndexChanged += new System.EventHandler(this.comboBoxCollect1D_SelectedIndexChanged);
             // 
             // label7
@@ -1919,8 +1922,7 @@ namespace JSONExtractor
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.GroupBox groupBox1;
-        private System.Windows.Forms.TextBox textBoxDedupeFilenames;
-        private System.Windows.Forms.CheckBox checkBoxDedupeFilenames;
+        private System.Windows.Forms.TextBox textBoxDedupeRegex;
         private System.Windows.Forms.Label labelDedupedCount;
         private System.Windows.Forms.GroupBox groupBox2;
         private System.Windows.Forms.TextBox textBoxDedupeWithin;
@@ -1962,6 +1964,7 @@ namespace JSONExtractor
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel9;
         private System.Windows.Forms.Button buttonSelectNone;
         private System.Windows.Forms.Button buttonSelectAll;
+        private System.Windows.Forms.CheckBox checkBoxDedupeFilenames;
     }
 }
 
