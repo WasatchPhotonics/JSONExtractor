@@ -106,6 +106,7 @@ namespace JSONExtractor
             this.label15 = new System.Windows.Forms.Label();
             this.labelSelectedName = new System.Windows.Forms.Label();
             this.labelSelectedType = new System.Windows.Forms.Label();
+            this.checkBoxPreview = new System.Windows.Forms.CheckBox();
             this.groupBox7 = new System.Windows.Forms.GroupBox();
             this.tableLayoutPanel6 = new System.Windows.Forms.TableLayoutPanel();
             this.textBoxExtractAttributeLabel = new System.Windows.Forms.TextBox();
@@ -414,6 +415,8 @@ namespace JSONExtractor
             // checkBoxDedupeFilenames
             // 
             this.checkBoxDedupeFilenames.AutoSize = true;
+            this.checkBoxDedupeFilenames.Checked = true;
+            this.checkBoxDedupeFilenames.CheckState = System.Windows.Forms.CheckState.Checked;
             this.checkBoxDedupeFilenames.Location = new System.Drawing.Point(3, 108);
             this.checkBoxDedupeFilenames.Name = "checkBoxDedupeFilenames";
             this.checkBoxDedupeFilenames.Size = new System.Drawing.Size(84, 24);
@@ -1148,7 +1151,7 @@ namespace JSONExtractor
             this.groupBox12.Margin = new System.Windows.Forms.Padding(2);
             this.groupBox12.Name = "groupBox12";
             this.groupBox12.Padding = new System.Windows.Forms.Padding(2);
-            this.groupBox12.Size = new System.Drawing.Size(204, 75);
+            this.groupBox12.Size = new System.Drawing.Size(204, 104);
             this.groupBox12.TabIndex = 1;
             this.groupBox12.TabStop = false;
             this.groupBox12.Text = "Selected Attribute";
@@ -1162,6 +1165,7 @@ namespace JSONExtractor
             this.tableLayoutPanel8.Controls.Add(this.label15, 0, 1);
             this.tableLayoutPanel8.Controls.Add(this.labelSelectedName, 1, 0);
             this.tableLayoutPanel8.Controls.Add(this.labelSelectedType, 1, 1);
+            this.tableLayoutPanel8.Controls.Add(this.checkBoxPreview, 0, 2);
             this.tableLayoutPanel8.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel8.Location = new System.Drawing.Point(2, 22);
             this.tableLayoutPanel8.Margin = new System.Windows.Forms.Padding(2);
@@ -1169,8 +1173,8 @@ namespace JSONExtractor
             this.tableLayoutPanel8.RowCount = 3;
             this.tableLayoutPanel8.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel8.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel8.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 12F));
-            this.tableLayoutPanel8.Size = new System.Drawing.Size(200, 51);
+            this.tableLayoutPanel8.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel8.Size = new System.Drawing.Size(200, 80);
             this.tableLayoutPanel8.TabIndex = 1;
             // 
             // label14
@@ -1217,10 +1221,25 @@ namespace JSONExtractor
             this.labelSelectedType.TabIndex = 3;
             this.labelSelectedType.Text = "List<double>[2048]";
             // 
+            // checkBoxPreview
+            // 
+            this.checkBoxPreview.Anchor = System.Windows.Forms.AnchorStyles.None;
+            this.checkBoxPreview.AutoSize = true;
+            this.checkBoxPreview.Checked = true;
+            this.checkBoxPreview.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.tableLayoutPanel8.SetColumnSpan(this.checkBoxPreview, 2);
+            this.checkBoxPreview.Location = new System.Drawing.Point(59, 52);
+            this.checkBoxPreview.Name = "checkBoxPreview";
+            this.checkBoxPreview.Size = new System.Drawing.Size(82, 24);
+            this.checkBoxPreview.TabIndex = 4;
+            this.checkBoxPreview.Text = "Preview";
+            this.checkBoxPreview.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.checkBoxPreview.UseVisualStyleBackColor = true;
+            // 
             // groupBox7
             // 
             this.groupBox7.Controls.Add(this.tableLayoutPanel6);
-            this.groupBox7.Location = new System.Drawing.Point(3, 350);
+            this.groupBox7.Location = new System.Drawing.Point(3, 379);
             this.groupBox7.Margin = new System.Windows.Forms.Padding(3, 19, 3, 3);
             this.groupBox7.Name = "groupBox7";
             this.groupBox7.Padding = new System.Windows.Forms.Padding(2, 1, 2, 1);
@@ -1292,6 +1311,8 @@ namespace JSONExtractor
             "None",
             "Mean",
             "Median",
+            "Max",
+            "Min",
             "Stdev",
             "Collate"});
             this.comboBoxCollect2D.Location = new System.Drawing.Point(83, 243);
@@ -1965,6 +1986,7 @@ namespace JSONExtractor
         private System.Windows.Forms.Button buttonSelectNone;
         private System.Windows.Forms.Button buttonSelectAll;
         private System.Windows.Forms.CheckBox checkBoxDedupeFilenames;
+        private System.Windows.Forms.CheckBox checkBoxPreview;
     }
 }
 

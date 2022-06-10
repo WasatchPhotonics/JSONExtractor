@@ -42,6 +42,7 @@ namespace JSONExtractor
 
         TreeNode collect2DPivotNode = null;
         List<string> collect2DRelativePath = null;
+        bool collect2DLoL;
 
         Cloud cloud;
 
@@ -383,12 +384,9 @@ namespace JSONExtractor
         {
             selectedPathnames.Sort();
             labelSelectedCount.Text = $"Selected: {selectedPathnames.Count}";
+            dedupedPathnames = selectedPathnames;
 
-            if (!checkBoxDedupeFilenames.Checked)
-            {
-                dedupedPathnames = selectedPathnames;
-            }
-            else
+            if (checkBoxDedupeFilenames.Checked)
             {
                 // parse Within list (on comma if found, else whitespace)
                 HashSet<string> withinSet = new();
@@ -411,41 +409,54 @@ namespace JSONExtractor
                 }
 
                 // Dedupe on unique token
-                var re = new Regex(textBoxDedupeRegex.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
-                Dictionary<string, string> latestUnique = new Dictionary<string, string>();
-                foreach (var pathname in selectedPathnames)
+                Regex re = null;
+                try
                 {
-                    var basename = Path.GetFileName(pathname).Split(".").First();
-                    var match = re.Match(basename);
-                    if (match.Success && match.Groups.Count > 1)
-                    {
-                        var unique = match.Groups[1].Value;
-
-                        // if we defined a Within list, then first ensure this is
-                        // a valid element
-                        if (withinSet.Count > 0)
-                            if (!withinSet.Contains(unique.ToLower()))
-                                continue;
-                        
-                        latestUnique[unique] = pathname;
-                    }
-                    else
-                    {
-                        if (withinSet.Count == 0)
-                        {
-                            // we didn't match the pattern, so just store the
-                            // pathname directly (do this if we're "just"
-                            // dedupping...if a "Within" list was specified, this
-                            // is a fail)
-                            latestUnique[basename] = pathname;
-                        }
-                    }
+                    re = new Regex(textBoxDedupeRegex.Text, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                }
+                catch(Exception)
+                {
+                    logger.error($"invalid regex: {textBoxDedupeRegex.Text}");
                 }
 
-                dedupedPathnames = new();
-                foreach (var pair in latestUnique)
-                    dedupedPathnames.Add(pair.Value);
-                dedupedPathnames.Sort();
+                if (re != null)
+                {
+                    Dictionary<string, string> latestUnique = new Dictionary<string, string>();
+                    foreach (var pathname in selectedPathnames)
+                    {
+                        var basename = Path.GetFileName(pathname).Split(".").First();
+                        var match = re.Match(basename);
+                        if (match.Success && match.Groups.Count > 1)
+                        {
+                            var unique = match.Groups[1].Value;
+
+                            // if we defined a Within list, then first ensure this is
+                            // a valid element
+                            if (withinSet.Count > 0)
+                                if (!withinSet.Contains(unique.ToLower()))
+                                    continue;
+
+                            latestUnique[unique] = pathname;
+                        }
+                        else
+                        {
+                            if (withinSet.Count == 0)
+                            {
+                                // we didn't match the pattern, so just store the
+                                // pathname directly (do this if we're "just"
+                                // dedupping...if a "Within" list was specified, this
+                                // is a fail)
+
+                                // latestUnique[basename] = pathname;
+                            }
+                        }
+                    }
+
+                    dedupedPathnames = new();
+                    foreach (var pair in latestUnique)
+                        dedupedPathnames.Add(pair.Value);
+                    dedupedPathnames.Sort();
+                }
             }
 
             logger.info($"deduped {dedupedPathnames.Count} filenames out of {selectedPathnames.Count}");
@@ -545,7 +556,8 @@ namespace JSONExtractor
                     // array leaf node
                     var tvn = treeNode.Nodes.Add(key + "[]");
                     tvn.ForeColor = SystemColors.HotTrack;
-                    var tt = Util.getJsonValueShortString(treeRoot, tvn.FullPath);
+                    var typeName = Util.getJsonType(treeRoot, tvn.FullPath);
+                    var tt = typeName.StartsWith("List<List<") ? typeName : Util.getJsonValueShortString(treeRoot, tvn.FullPath);
                     tvn.ToolTipText = tt;
                 }
                 else
@@ -643,20 +655,23 @@ namespace JSONExtractor
             area.ShadowOffset = 5;
             previewChart.ChartAreas.Add(area);
 
-            Series s = new Series();
-            s.ChartType = SeriesChartType.Line;
-            s.Color = Color.Blue;
-            previewChart.Series.Add(s);
-
             previewChart.Visible = false;
         }
 
         void treeViewJSON_NodeMouseHover(object sender, TreeNodeMouseHoverEventArgs e)
         {
             var tvn = e.Node;
-            if (!Util.isJsonArrayDouble(treeRoot, tvn.FullPath))
+            if (!checkBoxPreview.Checked)
             {
-                hidePreview();
+                previewChart.Visible = false;
+                return;
+            }
+
+            bool isLoL = Util.isLoL(treeRoot, tvn.FullPath);
+            bool isLoD = Util.isLoD(treeRoot, tvn.FullPath);
+            if (!isLoL && !isLoD)
+            {
+                previewChart.Visible = false;
                 return;
             }
 
@@ -672,13 +687,36 @@ namespace JSONExtractor
             previewChart.Width = Width / 3;
             previewChart.Height = Height / 3;
             previewChart.Visible = true;
+            previewChart.Series.Clear();
 
-            var s = previewChart.Series[0];
-            s.Points.Clear();
+            if (isLoL)
+            {
+                var data = Util.toLoL(treeRoot, tvn.FullPath);
+                foreach (var array in data)
+                {
+                    var s = newPreviewSeries(mono: false);
+                    for (int i = 0; i < array.Count; i++)
+                        s.Points.AddXY(i, array[i]);
+                }
+            }
+            else
+            {
+                var s = newPreviewSeries();
+                List<double> values = Util.toLoD(treeRoot, tvn.FullPath);
+                if (values != null)
+                    for (int i = 0; i < values.Count; i++)
+                        s.Points.AddXY(i, values[i]);
+            }
+        }
 
-            List<double> values = Util.getJsonArray(treeRoot, tvn.FullPath);
-            for (int i = 0; i < values.Count; i++)
-                s.Points.AddXY(i, values[i]);
+        Series newPreviewSeries(bool mono=true)
+        {
+            Series s = new Series();
+            s.ChartType = SeriesChartType.Line;
+            if (mono)
+                s.Color = Color.Blue;
+            previewChart.Series.Add(s);
+            return s;
         }
 
         void treeViewJSON_MouseLeave(object sender, EventArgs e) => hidePreview();
@@ -750,7 +788,10 @@ namespace JSONExtractor
         void updateExplanation()
         {
             string name = labelSelectedName.Text;
+            string collect1D = comboBoxCollect1D.Text;
+            string collect2D = comboBoxCollect2D.Text;
             string s = "No attribute has been selected.";
+
             if (name != "")
             {
                 s = $"The attribute '{name}', a {labelSelectedType.Text}, will be extracted to the report. ";
@@ -775,13 +816,19 @@ namespace JSONExtractor
 
                     if (collect2DPivotNode != null)
                     {
-                        string path = string.Join(" -> ", collect2DRelativePath);
-                        s += $"\n\nSince the path {path} can be found repeated under each key of '{collect2DPivotNode.Text}' (with the same type and dimension), Collect2D aggregation is available. ";
+                        if (collect2DLoL)
+                        {
+                            s += $"\n\nSince '{collect2DPivotNode.Text}' is a list-of-lists, Collect2D aggregation is REQUIRED. ";
+                        }
+                        else
+                        {
+                            string path = string.Join(" -> ", collect2DRelativePath);
+                            s += $"\n\nSince the path {path} can be found repeated under each key of '{collect2DPivotNode.Text}' (with the same type and dimension), Collect2D aggregation is available. ";
+                        }
                         if (comboBoxCollect2D.SelectedIndex > -1)
                         {
-                            string function = comboBoxCollect2D.Text;
-                            if (function != "Collate")
-                                s += $"As Collect2D has been enabled, each individual value of the '{name}' array under '{collect2DPivotNode.Text}' will be aggregated across attributes using {function}(). ";
+                            if (collect2D != "Collate")
+                                s += $"As Collect2D has been enabled, each individual value of the '{name}' array under '{collect2DPivotNode.Text}' will be aggregated across attributes using {collect2D}(). ";
                             else
                                 s += $"As 'Collate' has been selected, each '{name}' array under '{collect2DPivotNode.Text}' will be extracted and added to the resulting table" +
                                       (checkBoxGraph.Checked ? " (and graph)." : ".");
@@ -796,21 +843,20 @@ namespace JSONExtractor
                     var noneSelected = "However, as no aggregation function was selected, no aggregation will be performed. ";
                     if (comboBoxCollect1D.SelectedIndex > -1)
                     {
-                        string function = comboBoxCollect1D.Text;
-                        if (function != "None")
+                        if (collect1D != "None")
                         {
-                            s += $"As {function} was selected, the attribute will be ";
-                            switch (function)
+                            s += $"As Collect1D {collect1D} was selected, the attribute will be ";
+                            switch (collect1D)
                             {
                                 case "TableRows": s += "appended as a block of row-ordered, comma-delimited arrays at the bottom of the extract. "; break;
                                 case "TableCols": s += "appended as a block of column-ordered, comma-delimited arrays at the bottom of the extract. "; break;
                                 case "PipeDelimited": s += "collapsed to a single pipe-delimited string (|) and included in the standard extract table. "; break;
                                 case "CommaDelimited": s += "appended to the ongoing extract CSV as a series of comma-delimited vaues. "; break;
-                                default: s += "collapsed into a single scalar value using the {function}() function. "; break;
+                                default: s += $"collapsed into a single scalar value using the {collect1D}() function. "; break;
                             }
 
                             if (collect2DPivotNode != null)
-                                s += "It is important to note that Collect2D aggregation will be performed BEFORE Collect1D aggregation. ";
+                                s += $"It is important to note that Collect2D aggregation ({collect2D}) will be performed BEFORE Collect1D aggregation. ";
                         }
                         else
                             s += noneSelected;
@@ -876,11 +922,18 @@ namespace JSONExtractor
             {
                 ea.collect2DPivotPath = collect2DPivotNode.FullPath;
                 ea.collect2DRelativePath = collect2DRelativePath;
+                ea.collect2DLoL = collect2DLoL;
                 ea.collect2D = (ExtractAttribute.Collect2D)Enum.Parse(
                     typeof(ExtractAttribute.Collect2D), comboBoxCollect2D.Text);
             }
 
             ea.graph = checkBoxGraph.Checked;
+
+            if (collect2DLoL && !ea.doingCollect2D())
+            {
+                logger.error("Collect2D is currently required for List-of-Lists");
+                return;
+            }
 
             logger.debug($"adding {ea}");
             extractAttributes.Add(ea);
@@ -1068,51 +1121,76 @@ namespace JSONExtractor
             extractAttributes.Insert(row + 1, ea);
         }
 
-        // is 2D collection possible from the selected attribute?
+        /// <summary>
+        /// is 2D collection possible from the selected attribute?
+        /// </summary>
+        /// <param name="tvn">The just-selected TreeViewNode</param>
         void updateCollect2D(TreeNode tvn)
         {
             if (tvn != null && tvn.Parent != null && tvn.Text.EndsWith("[]"))
             {
                 List<string> pathTok = tvn.FullPath.Split('\\').ToList();
-                List<object> l = (List<object>)Util.getJsonValue(treeRoot, tvn.FullPath);
+                var obj = Util.getJsonValue(treeRoot, tvn.FullPath);
+                if (obj is null)
+                {
+                    logger.error("updateCollect2D: obj null?");
+                    setCollect2DNotPossible();
+                    return;
+                }
+
+                // is this a List<List<double>> (BaselineTest)?
+                if (Util.isLoL(obj))
+                { 
+                    setCollect2DPossible(tvn, tvn, new List<string>());
+                    return;
+                }
+
+                // this is not a list-of-lists, so search upwards for a pivot node
+                List<object> l = (List<object>)obj;
                 Collect2DSignature sigNode = new()
                 {
-                    name = pathTok.Last(),   // e.g. 'processed[]'
-                    count = l.Count,          // e.g. 2048
-                    type = l.GetType(),      // e.g. List<double>
-                    subtype = l[0].GetType(),   // e.g. double
+                    name = pathTok.Last(),      // e.g. 'processed[]'
+                    count = l.Count,            // e.g. 2048
+                    type = l.GetType(),         // e.g. List<double> 
+                    subtype = l[0].GetType(),   // e.g. double       
                 };
                 List<Collect2DSignature> sigList = new() { sigNode };
 
                 Tuple<TreeNode, List<string>> retval = findPivot(tvn.Parent.Parent, sigList);
                 if (retval != null)
                 {
-                    // 2D collection is possible
-
-                    collect2DPivotNode = retval.Item1;
-                    collect2DRelativePath = retval.Item2;
-
-                    var hint = collect2DPivotNode + " -> " + Util.joinAny(collect2DRelativePath);
-                    logger.debug($"collect2D possible for {tvn.Text} ({hint})");
-                    comboBoxCollect2D.Enabled = true;
-                    toolTip1.SetToolTip(comboBoxCollect2D, hint);
-                    labelCollect2D.ForeColor = SystemColors.ControlText;
-
-                    updateExplanation();
+                    setCollect2DPossible(tvn, retval.Item1, retval.Item2);
                     return;
                 }
             }
+            setCollect2DNotPossible();
+        }
 
-            // collect2D not possible
+        void setCollect2DPossible(TreeNode srcNode, TreeNode pivotNode, List<string>relativePath)
+        {
+            collect2DPivotNode = pivotNode;
+            collect2DRelativePath = relativePath;
+            collect2DLoL = relativePath.Count == 0;
+
+            string hint = collect2DLoL ? "list-of-lists" : (collect2DPivotNode.Text + " -> " + Util.joinAny(collect2DRelativePath));
+            logger.debug($"collect2D possible for {srcNode.Text} ({hint})");
+            comboBoxCollect2D.Enabled = true;
+            toolTip1.SetToolTip(comboBoxCollect2D, hint);
+            labelCollect2D.ForeColor = SystemColors.ControlText;
+            updateExplanation();
+        }
+
+        void setCollect2DNotPossible()
+        {
             var msg = "Collect2D is not possible for the selected attribute.";
             collect2DPivotNode = null;
             collect2DRelativePath = null;
+            collect2DLoL = false;
             comboBoxCollect2D.Enabled = false;
             comboBoxCollect2D.SelectedIndex = 0;
             toolTip1.SetToolTip(comboBoxCollect2D, msg);
             labelCollect2D.ForeColor = SystemColors.GrayText;
             logger.debug(msg);
-
             updateExplanation();
         }
 
@@ -1569,7 +1647,7 @@ namespace JSONExtractor
                             extractChart.BeginInvoke(new MethodInvoker(delegate { addGraphableRecords(ea, graphableRecords); }));
                     }
                     else
-                        values.Add(ea.formatValue(value));
+                        values.Add(ea.formatValue(value, jsonObj));
                 }
 
                 if (!hasData)

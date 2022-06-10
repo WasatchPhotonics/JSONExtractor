@@ -135,7 +135,10 @@ namespace JSONExtractor
             lock (instance)
             {
                 // you'd think there'd be a standard collection that does this (size-limited queue/buffer)
-                errors.AddLast(String.Format(fmt, obj));
+                if (obj.Length > 0)
+                    errors.AddLast(String.Format(fmt, obj));
+                else
+                    errors.AddLast(fmt);
                 errorCount++;
                 while (errorCount > MAX_ERRORS)
                 {
@@ -264,11 +267,8 @@ namespace JSONExtractor
             else if (Task.CurrentId != null)
                 threadName = $"[Task 0x{Task.CurrentId:x4}] ";
 
-            string msg = string.Format("{0}: {1}{2}: {3}",
-                getTimestamp(),
-                threadName,
-                lvl,
-                string.Format(fmt, obj));
+            string txt = obj.Length > 0 ? string.Format(fmt, obj) : fmt;
+            string msg = $"{getTimestamp()}: {threadName}{lvl}: {txt}";
 
             lock (instance)
             {

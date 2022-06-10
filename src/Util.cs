@@ -11,6 +11,39 @@ namespace JSONExtractor
     {
         static Logger logger = Logger.getInstance();
 
+        ////////////////////////////////////////////////////////////////////////
+        //                                                                    //
+        //                         String Helpers                             //
+        //                                                                    //
+        ////////////////////////////////////////////////////////////////////////
+
+        public static string joinAny(IEnumerable<object> things, string delim = ", ")
+        {
+            return string.Join(delim, things.Select(thing => thing.ToString()).ToArray());
+        }
+
+        public static string timeRemainingLabel(double totalSec)
+        {
+            int hours = (int)Math.Floor(totalSec / 3600);
+            if (hours > 1)
+            {
+                int mins = (int)Math.Ceiling((totalSec - (hours * 3600)) / 60.0);
+                return $"{hours}hr {mins}min remaining";
+            }
+            else
+            {
+                int mins = (int)Math.Floor(totalSec / 60.0);
+                int secs = (int)Math.Ceiling(totalSec - (mins * 60));
+                return $"{mins}min {secs}sec remaining";
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        //                                                                    //
+        //                          File Helpers                              //
+        //                                                                    //
+        ////////////////////////////////////////////////////////////////////////
+
         /// <summary>
         /// Load all text from the specified file and return as a string. If 
         /// filename ends in ".gz", uncompress it automatically.
@@ -40,6 +73,26 @@ namespace JSONExtractor
                 result.Add(toDouble(l[i]));
             return result;
         }
+
+        // surely there's an easier way to do this
+        public static double toDouble(object o)
+        {
+            if (o is Double d) return d;
+            if (o is Single f) return f;
+            if (o is Int64 i64) return i64;
+            if (o is Int32 i32) return i32;
+            if (o is Int16 i16) return i16;
+            return Double.NaN;
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        //                                                                    //
+        //                          JSON Helpers                              //
+        //                                                                    //
+        ////////////////////////////////////////////////////////////////////////
+
+        // I'm not sure I'm doing all these type conversions as elegantly or
+        // efficiently as possible.  Suggestions welcome!
 
         /// <summary>
         /// Given the root of a JSON object tree and a backslash-delimited path 
@@ -85,55 +138,138 @@ namespace JSONExtractor
             return result;
         }
 
-        public static string getJsonType(IDictionary<string, object> node, string jsonPath)
+        /// <summary>
+        /// Instead of returning the actual object at a given path (of type 
+        /// Double[] or whatever with 2048 elements), return a string which is 
+        /// "representative" of the object contents. Used for mouseOver tooltips.
+        /// </summary>
+        public static string getJsonValueShortString(IDictionary<string, object> node, string jsonPath)
         {
-            string result = "";
-            var value = getJsonValue(node, jsonPath);
-            if (value == null)
-                result = "";
-            else if (value is List<object>)
+            var obj = getJsonValue(node, jsonPath);
+
+            // handle scalars
+            if (obj is not List<object>)
+                return obj.ToString();
+
+            // handle lists
+            var l = (List<object>)obj;
+            List<string> tok = new();
+            if (l.Count <= 5)
+                for (int i = 0; i < l.Count; i++)
+                    tok.Add(l[i].ToString());
+            else
             {
-                var l = (List<object>)value;
+                for (int i = 0; i < 3; i++)
+                    tok.Add(l[i].ToString());
+                tok.Add("...");
+                for (int i = l.Count - 3; i < l.Count; i++)
+                    tok.Add(l[i].ToString());
+            }
+            return "[" + string.Join(", ", tok) + "]";
+        }
+
+        public static string getJsonType(object obj)
+        { 
+            string result = "";
+            if (obj == null)
+                result = "";
+            else if (obj is List<object> l)
+            {
                 var cnt = l.Count;
-                if (cnt == 0) 
+                if (cnt == 0)
                     result = "List<object>";
-                else 
-                    result = $"List<{l[0].GetType()}>[{cnt}]";
+                else
+                {
+                    var subObj = l[0];
+                    if (subObj is List<object> subList)
+                        result = $"List<List<{subList[0].GetType()}>>[{cnt}]";
+                    else
+                        result = $"List<{l[0].GetType()}>[{cnt}]";
+                }
             }
             else 
-                result = value.GetType().ToString();
+                result = obj.GetType().ToString();
             return result.Replace("System.", "");
         }
 
-        public static bool isJsonArrayDouble(IDictionary<string, object> node, string jsonPath)
+        public static string getJsonType(IDictionary<string, object> node, string jsonPath)
         {
             var obj = getJsonValue(node, jsonPath);
-            if (!(obj is List<object>))
-                return false;
-            var l = (List<object>)obj;
-            try
-            {
-                double d;
-                foreach (var o in l)
-                    d = (double)o;
-            }
-            catch
-            {
-                return false;
-            }
-            return true;
+            return getJsonType(obj);
         }
 
-        public static List<double> getJsonArray(IDictionary<string, object> node, string jsonPath)
+        // is this a List-of-Lists [of double]?
+        public static bool isLoL(IDictionary<string, object> node, string jsonPath)
         {
             var obj = getJsonValue(node, jsonPath);
-            if (obj is List<object>)
-                return forceDouble((List<object>)obj);
+            return isLoL(obj);
+        }
+
+        // is this a List-of-Double?
+        public static bool isLoD(IDictionary<string, object> node, string jsonPath)
+        {
+            var obj = getJsonValue(node, jsonPath);
+            return isLoD(obj);
+        }
+
+        public static bool isLoL(object obj) 
+        {
+            var typeName = getJsonType(obj);
+            return typeName.StartsWith("List<List<Double>>");
+        }
+
+        public static bool isLoD(object obj)
+        {
+            var typeName = getJsonType(obj);
+            return typeName.StartsWith("List<Double>");
+        }
+
+        public static List<double> toLoD(IDictionary<string, object> node, string jsonPath)
+        {
+            var obj = getJsonValue(node, jsonPath);
+            if (obj is List<object> l)
+                return l.Cast<double>().ToList();
             return null;
         }
 
+        public static List<List<double>> toLoL(IDictionary<string, object> node, string jsonPath)
+        {
+            List<List<double>> data = new();
+
+            var pivotObj = Util.getJsonValue(node, jsonPath);
+            List<object> l = (List<object>)pivotObj;
+            foreach (var subObj in l)
+            {
+                List<object> subList = (List<object>)subObj;
+                List<double> values = subList.Cast<double>().ToList();
+                data.Add(values);
+            }
+            return data;
+        }
+
+        public static List<List<double>> toLoLTransposed(IDictionary<string, object> node, string jsonPath)
+        {
+            List<List<double>> data = new();
+
+            var pivotObj = Util.getJsonValue(node, jsonPath);
+            List<object> l = (List<object>)pivotObj;
+            foreach (var subObj in l)
+            {
+                List<object> subList = (List<object>)subObj;
+                List<double> values = subList.Cast<double>().ToList();
+                if (data.Count == 0)
+                    for (int i = 0; i < values.Count; i++)
+                        data.Add(new List<double>());
+                for (int i = 0; i < values.Count; i++)
+                    data[i].Add(values[i]);
+            }
+            return data;
+        }
+
         ////////////////////////////////////////////////////////////////////////
-        // Math helpers
+        //                                                                    //
+        //                          Math Helpers                              //
+        //                                                                    //
         ////////////////////////////////////////////////////////////////////////
 
         public static List<double> mean2D(List<List<double>> data)
@@ -183,67 +319,20 @@ namespace JSONExtractor
             return result;
         }
 
-        public static string timeRemainingLabel(double totalSec)
+        public static List<double> max2D(List<List<double>> data)
         {
-            int hours = (int)Math.Floor(totalSec / 3600);
-            if (hours > 1)
-            {
-                int mins = (int)Math.Ceiling((totalSec - (hours * 3600)) / 60.0);
-                return $"{hours}hr {mins}min remaining";
-            }
-            else
-            {
-                int mins = (int)Math.Floor(totalSec / 60.0);
-                int secs = (int)Math.Ceiling(totalSec - (mins * 60));
-                return $"{mins}min {secs}sec remaining";
-            }
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(data[i].Max());
+            return result;
         }
 
-        // surely there's an easier way to do this
-        public static double toDouble(object o)
+        public static List<double> min2D(List<List<double>> data)
         {
-            if (o is Double) return (Double)o;
-            if (o is Single) return (Single)o;
-            if (o is Int64) return (Int64)o;
-            if (o is Int32) return (Int32)o;
-            if (o is Int16) return (Int16)o;
-            return Double.NaN;
+            List<double> result = new();
+            for (int i = 0; i < data.Count; i++)
+                result.Add(data[i].Min());
+            return result;
         }
-
-        /// <summary>
-        /// Instead of returning the actual object at a given path (of type 
-        /// Double[] or whatever with 2048 elements), return a string which is 
-        /// "representative" of the object contents. Used for mouseOver tooltips.
-        /// </summary>
-        public static string getJsonValueShortString(IDictionary<string, object> node, string jsonPath)
-        {
-            var obj = getJsonValue(node, jsonPath);
-
-            // handle scalars
-            if (obj is not List<object>)
-                return obj.ToString();
-
-            // handle lists
-            var l = (List<object>)obj;
-            List<string> tok = new();
-            if (l.Count <= 5)
-                for (int i = 0; i < l.Count; i++)
-                    tok.Add(l[i].ToString());
-            else
-            {
-                for (int i = 0; i < 3; i++)
-                    tok.Add(l[i].ToString());
-                tok.Add("...");
-                for (int i = l.Count - 3; i < l.Count; i++)
-                    tok.Add(l[i].ToString());
-            }
-            return "[" + string.Join(", ", tok) + "]";
-        }
-
-        public static string joinAny(IEnumerable<object> things, string delim = ", ")
-        {
-            return string.Join(delim, things.Select(thing => thing.ToString()).ToArray());
-        }
-
     }
 }

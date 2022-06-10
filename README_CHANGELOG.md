@@ -1,5 +1,8 @@
 # Changelog
 
+- 2022-06-10 1.4.1
+    - added LoL (list of lists)
+    - major cleanup of ExtractAttribute and Util
 - 2022-06-08 1.4.0
     - graphing works well
 - 2022-05-27 1.3.0
