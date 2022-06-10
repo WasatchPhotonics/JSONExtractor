@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Drawing;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace JSONExtractor
@@ -616,7 +617,7 @@ namespace JSONExtractor
                 comboBoxCollect1D.Enabled = false;
             }
 
-            var label = tvn.Text;
+            var label = (tvn.Parent == null || tvn.Parent.Text == "root") ? tvn.Text : $"{tvn.Parent.Text}\\{tvn.Text}";
 
             labelSelectedName.Text = label;
             labelSelectedType.Text = Util.getJsonType(treeRoot, tvn.FullPath);
@@ -1665,6 +1666,9 @@ namespace JSONExtractor
                 outfile.WriteLine(string.Join(',', values));
                 extractedCount++;
                 updateFileCountsDelegate();
+
+                Thread.Sleep(100);
+
             }
 
             // if this extract had any tabular attributes, append them at the bottom

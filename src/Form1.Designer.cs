@@ -1370,6 +1370,11 @@ namespace JSONExtractor
             this.numericUpDownExtractAttributePrecision.TabIndex = 8;
             this.numericUpDownExtractAttributePrecision.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.toolTip1.SetToolTip(this.numericUpDownExtractAttributePrecision, "Decimal precision (-1 for max)");
+            this.numericUpDownExtractAttributePrecision.Value = new decimal(new int[] {
+            2,
+            0,
+            0,
+            0});
             // 
             // checkBoxInterpolate
             // 

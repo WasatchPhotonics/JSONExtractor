@@ -37,9 +37,7 @@ So now there is one :-)
 
 # Backlog
 
-- Cancel button for Sync
-- Collect2 should only take first space-delimited matching names? (See DarkBackgroundTest)
-- shift-click for range of fields in Collect2?
+- support \[ { rec1 }, { rec2 } ] (WavelengthCalibrationTest.FWHM.LineResolution)
 
 # Architecture
 

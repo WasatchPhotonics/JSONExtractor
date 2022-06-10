@@ -228,7 +228,7 @@ namespace JSONExtractor
         {
             var obj = getJsonValue(node, jsonPath);
             if (obj is List<object> l)
-                return l.Cast<double>().ToList();
+                return forceDouble(l);
             return null;
         }
 

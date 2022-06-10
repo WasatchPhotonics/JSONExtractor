@@ -56,7 +56,8 @@ namespace JSONExtractor
             // trade space for time and store as a lookup for speed
             data = new SortedDictionary<double, double>();
             for (int i = 0; i < pixels; i++)
-                data.Add(oldX[i], oldY[i]);
+                if (!data.ContainsKey(oldX[i]))
+                    data.Add(oldX[i], oldY[i]);
         }
 
         /// <summary>
